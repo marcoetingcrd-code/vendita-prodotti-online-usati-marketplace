@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Nuovo Prodotto — Prodotti Usati{% endblock %}
+
+{% block content %}
+<div x-data="newProduct()" class="max-w-3xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/panel" class="text-gray-400 hover:text-gray-600">←</a>
+        <h1 class="text-2xl font-bold">Nuovo Prodotto</h1>
+    </div>
+
+    <form @submit.prevent="submit()" class="space-y-6">
+
+        <!-- Proprietario + Titolo -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Informazioni base</h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Proprietario *</label>
+                    <select x-model="form.owner_id" required
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="">Seleziona...</option>
+                        {% for owner in owners %}
+                        <option value="{{ owner.id }}">{{ owner.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Titolo</label>
+                    <input type="text" x-model="form.title" placeholder="Es: Sedia vintage in legno"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                    <select x-model="form.category"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="">Seleziona...</option>
+                        <option>Arredamento</option>
+                        <option>Elettronica</option>
+                        <option>Abbigliamento</option>
+                        <option>Sport</option>
+                        <option>Casa</option>
+                        <option>Libri</option>
+                        <option>Giocattoli</option>
+                        <option>Auto e Moto</option>
+                        <option>Collezionismo</option>
+                        <option>Altro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Condizione</label>
+                    <select x-model="form.condition"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="">Seleziona...</option>
+                        <option value="nuovo">Nuovo</option>
+                        <option value="come_nuovo">Come nuovo</option>
+                        <option value="buono">Buono</option>
+                        <option value="usato">Usato</option>
+                        <option value="difettoso">Difettoso</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prezzo e Dettagli -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Prezzo e dettagli</h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prezzo richiesto (€)</label>
+                    <input type="number" step="0.01" x-model.number="form.price_initial" placeholder="0.00"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Dimensioni</label>
+                    <input type="text" x-model="form.dimensions" placeholder="L x P x H cm"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Logistica</label>
+                    <select x-model="form.logistics_status"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="">Seleziona...</option>
+                        <option value="da_ritirare">Da ritirare</option>
+                        <option value="ritirato">Ritirato</option>
+                        <option value="in_magazzino">In magazzino</option>
+                        <option value="spedito">Spedito</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Misure dettagliate</label>
+                <input type="text" x-model="form.measurements" placeholder="Es: Seduta 45cm, Schienale 90cm..."
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Difetti</label>
+                <textarea x-model="form.defects" rows="2" placeholder="Descrivi eventuali difetti visibili..."
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Note</label>
+                <textarea x-model="form.notes" rows="2" placeholder="Note aggiuntive..."
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Zona ritiro</label>
+                    <input type="text" x-model="form.pickup_location" placeholder="Es: Milano, zona Navigli"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Urgenza</label>
+                    <select x-model="form.urgency"
+                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="low">Bassa</option>
+                        <option value="medium">Media</option>
+                        <option value="high">Alta</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Immagini -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Immagini</h2>
+
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition cursor-pointer"
+                 @click="$refs.fileInput.click()"
+                 @dragover.prevent="dragOver = true"
+                 @dragleave="dragOver = false"
+                 @drop.prevent="handleDrop($event)"
+                 :class="dragOver ? 'border-indigo-500 bg-indigo-50' : ''">
+                <input type="file" x-ref="fileInput" multiple accept="image/*" @change="handleFiles($event)" class="hidden">
+                <div class="text-4xl mb-2">📸</div>
+                <p class="text-sm font-medium text-gray-700">Clicca o trascina le foto qui</p>
+                <p class="text-xs text-gray-400 mt-1">JPG, PNG — max 10MB per file</p>
+            </div>
+
+            <!-- Preview -->
+            <div x-show="previews.length > 0" class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                <template x-for="(img, i) in previews" :key="i">
+                    <div class="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+                        <img :src="img.url" class="w-full h-full object-cover">
+                        <button @click.prevent="removeImage(i)" type="button"
+                                class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition">✕</button>
+                        <div x-show="i === 0" class="absolute bottom-0 left-0 right-0 bg-indigo-600 text-white text-xs text-center py-0.5">Principale</div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex items-center gap-3">
+            <button type="submit" :disabled="saving"
+                    class="px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm">
+                <span x-show="!saving">Crea Prodotto</span>
+                <span x-show="saving">Salvataggio...</span>
+            </button>
+            <a href="/panel" class="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900">Annulla</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function newProduct() {
+    return {
+        form: {
+            owner_id: '',
+            title: '',
+            category: '',
+            condition: '',
+            price_initial: null,
+            dimensions: '',
+            measurements: '',
+            logistics_status: '',
+            defects: '',
+            notes: '',
+            pickup_location: '',
+            urgency: 'low',
+        },
+        files: [],
+        previews: [],
+        dragOver: false,
+        saving: false,
+
+        handleFiles(e) {
+            for (const file of e.target.files) this.addFile(file);
+        },
+        handleDrop(e) {
+            this.dragOver = false;
+            for (const file of e.dataTransfer.files) this.addFile(file);
+        },
+        addFile(file) {
+            if (!file.type.startsWith('image/')) return;
+            this.files.push(file);
+            this.previews.push({ url: URL.createObjectURL(file), name: file.name });
+        },
+        removeImage(i) {
+            URL.revokeObjectURL(this.previews[i].url);
+            this.files.splice(i, 1);
+            this.previews.splice(i, 1);
+        },
+
+        async submit() {
+            if (!this.form.owner_id) { toast('Seleziona un proprietario', 'error'); return; }
+            this.saving = true;
+            try {
+                const product = await api('/api/products/', {
+                    method: 'POST',
+                    body: JSON.stringify(this.form)
+                });
+
+                for (let i = 0; i < this.files.length; i++) {
+                    const fd = new FormData();
+                    fd.append('file', this.files[i]);
+                    fd.append('is_primary', i === 0 ? 'true' : 'false');
+                    await fetch(`/api/products/${product.id}/upload`, { method: 'POST', body: fd });
+                }
+
+                toast('Prodotto creato!');
+                window.location.href = `/panel/prodotti/${product.id}`;
+            } catch (e) {
+                toast(e.message || 'Errore creazione', 'error');
+            } finally {
+                this.saving = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

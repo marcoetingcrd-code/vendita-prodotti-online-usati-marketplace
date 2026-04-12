@@ -43,9 +43,12 @@ class Product(Base):
     platform_links: Mapped[dict | None] = mapped_column(JSON)  # {"subito":"url","ebay":"url"}
 
     pickup_location: Mapped[str | None] = mapped_column(String)
+    logistics_status: Mapped[str | None] = mapped_column(String)  # da_ritirare, ritirato, in_magazzino, spedito
     is_dismantled: Mapped[bool] = mapped_column(Boolean, default=False)
     shipping_available: Mapped[bool] = mapped_column(Boolean, default=False)
     urgency: Mapped[str] = mapped_column(String, default="low")  # low, medium, high
+    measurements: Mapped[str | None] = mapped_column(Text)
+    desc_facebook: Mapped[str | None] = mapped_column(Text)
 
     ai_detected_object: Mapped[str | None] = mapped_column(String)
     ai_confidence: Mapped[float | None] = mapped_column(Float)
@@ -59,6 +62,7 @@ class Product(Base):
     owner = relationship("Owner", back_populates="products", lazy="selectin")
     images = relationship("ProductImage", back_populates="product", lazy="selectin", cascade="all, delete-orphan")
     price_history = relationship("PriceHistory", back_populates="product", lazy="selectin", cascade="all, delete-orphan")
+    publications = relationship("Publication", back_populates="product", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Product {self.title} ({self.status})>"
@@ -72,6 +76,8 @@ class ProductImage(Base):
     original_path: Mapped[str] = mapped_column(String, nullable=False)
     processed_path: Mapped[str | None] = mapped_column(String)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_ai_processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     product = relationship("Product", back_populates="images")
@@ -87,6 +93,22 @@ class PriceHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     product = relationship("Product", back_populates="price_history")
+
+
+class Publication(Base):
+    __tablename__ = "publications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
+    product_id: Mapped[str] = mapped_column(String, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False)  # subito, ebay, vinted, facebook
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, published, paused, removed
+    link: Mapped[str | None] = mapped_column(String)
+    notes: Mapped[str | None] = mapped_column(Text)
+    is_manual: Mapped[bool] = mapped_column(Boolean, default=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    product = relationship("Product", back_populates="publications")
 
 
 class ActivityLog(Base):

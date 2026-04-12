@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from app.database import get_db
-from app.models.product import Product, ProductImage, PriceHistory, ActivityLog
+from app.models.product import Product, ProductImage, PriceHistory, ActivityLog, Publication
 from app.models.owner import Owner
 from app.services import gemini, image_processor
 from app.services.notifications import notify_product_created, notify_product_sold
@@ -20,6 +20,10 @@ class ProductCreate(BaseModel):
     condition: str | None = None
     price_initial: float | None = None
     pickup_location: str | None = None
+    logistics_status: str | None = None
+    measurements: str | None = None
+    defects: str | None = None
+    dimensions: str | None = None
     urgency: str = "low"
     notes: str | None = None
 
@@ -29,11 +33,20 @@ class ProductUpdate(BaseModel):
     description_raw: str | None = None
     category: str | None = None
     condition: str | None = None
+    price_initial: float | None = None
     price_listed: float | None = None
     status: str | None = None
     pickup_location: str | None = None
+    logistics_status: str | None = None
+    measurements: str | None = None
+    defects: str | None = None
+    dimensions: str | None = None
     urgency: str | None = None
     notes: str | None = None
+    desc_subito: str | None = None
+    desc_ebay: str | None = None
+    desc_vinted: str | None = None
+    desc_facebook: str | None = None
     platforms: list[str] | None = None
     platform_links: dict | None = None
 
@@ -46,6 +59,7 @@ class SoldRequest(BaseModel):
 async def list_products(
     owner_id: str | None = None,
     status: str | None = None,
+    search: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Product).order_by(Product.created_at.desc())
@@ -53,6 +67,8 @@ async def list_products(
         query = query.where(Product.owner_id == owner_id)
     if status:
         query = query.where(Product.status == status)
+    if search:
+        query = query.where(Product.title.ilike(f"%{search}%"))
     result = await db.execute(query)
     products = result.scalars().all()
     return [_serialize_product(p) for p in products]
@@ -231,6 +247,82 @@ async def delete_product(product_id: str, db: AsyncSession = Depends(get_db)):
     return {"deleted": product_id}
 
 
+# --- Image Management ---
+
+@router.delete("/{product_id}/images/{image_id}")
+async def delete_image(product_id: str, image_id: str, db: AsyncSession = Depends(get_db)):
+    await _get_or_404(db, product_id)
+    img = await db.get(ProductImage, image_id)
+    if not img or img.product_id != product_id:
+        raise HTTPException(404, "Immagine non trovata")
+    await db.delete(img)
+    await db.commit()
+    return {"deleted": image_id}
+
+
+# --- Publications ---
+
+class PublicationCreate(BaseModel):
+    platform: str
+    status: str = "pending"
+    link: str | None = None
+    notes: str | None = None
+    is_manual: bool = True
+
+
+class PublicationUpdate(BaseModel):
+    status: str | None = None
+    link: str | None = None
+    notes: str | None = None
+
+
+@router.get("/{product_id}/publications/")
+async def list_publications(product_id: str, db: AsyncSession = Depends(get_db)):
+    await _get_or_404(db, product_id)
+    result = await db.execute(select(Publication).where(Publication.product_id == product_id))
+    pubs = result.scalars().all()
+    return [
+        {"id": p.id, "platform": p.platform, "status": p.status, "link": p.link,
+         "notes": p.notes, "is_manual": p.is_manual,
+         "published_at": p.published_at.isoformat() if p.published_at else None}
+        for p in pubs
+    ]
+
+
+@router.post("/{product_id}/publications/")
+async def create_publication(product_id: str, data: PublicationCreate, db: AsyncSession = Depends(get_db)):
+    await _get_or_404(db, product_id)
+    pub = Publication(
+        product_id=product_id,
+        platform=data.platform,
+        status=data.status,
+        link=data.link,
+        notes=data.notes,
+        is_manual=data.is_manual,
+        published_at=datetime.now(timezone.utc) if data.status == "published" else None,
+    )
+    db.add(pub)
+    await db.commit()
+    await db.refresh(pub)
+    return {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
+
+
+@router.patch("/{product_id}/publications/{pub_id}")
+async def update_publication(product_id: str, pub_id: str, data: PublicationUpdate, db: AsyncSession = Depends(get_db)):
+    await _get_or_404(db, product_id)
+    pub = await db.get(Publication, pub_id)
+    if not pub or pub.product_id != product_id:
+        raise HTTPException(404, "Pubblicazione non trovata")
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(pub, key, value)
+    if data.status == "published" and not pub.published_at:
+        pub.published_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(pub)
+    return {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
+
+
 async def _get_or_404(db: AsyncSession, product_id: str) -> Product:
     product = await db.get(Product, product_id)
     if not product:
@@ -248,17 +340,20 @@ def _serialize_product(p: Product) -> dict:
         "desc_subito": p.desc_subito,
         "desc_ebay": p.desc_ebay,
         "desc_vinted": p.desc_vinted,
+        "desc_facebook": p.desc_facebook,
         "category": p.category,
         "condition": p.condition,
         "condition_score": p.condition_score,
         "defects": p.defects,
         "dimensions": p.dimensions,
+        "measurements": p.measurements,
         "weight_kg": p.weight_kg,
         "price_initial": p.price_initial,
         "price_ai_suggested": p.price_ai_suggested,
         "price_listed": p.price_listed,
         "price_sold": p.price_sold,
         "status": p.status,
+        "logistics_status": p.logistics_status,
         "platforms": p.platforms,
         "platform_links": p.platform_links,
         "pickup_location": p.pickup_location,
@@ -269,7 +364,8 @@ def _serialize_product(p: Product) -> dict:
         "ai_confidence": p.ai_confidence,
         "notes": p.notes,
         "images": [
-            {"id": img.id, "original": img.original_path, "processed": img.processed_path, "is_primary": img.is_primary}
+            {"id": img.id, "original": img.original_path, "processed": img.processed_path,
+             "is_primary": img.is_primary, "is_ai_processed": img.is_ai_processed, "is_accepted": img.is_accepted}
             for img in (p.images or [])
         ],
         "created_at": p.created_at.isoformat() if p.created_at else None,

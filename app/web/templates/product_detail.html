@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% block title %}{{ product.title or 'Prodotto' }} — Prodotti Usati{% endblock %}
+
+{% block content %}
+<div x-data="productDetail()" x-init="init()">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div class="flex items-center gap-3">
+            <a href="/panel" class="text-gray-400 hover:text-gray-600">←</a>
+            <div>
+                <h1 class="text-2xl font-bold" x-text="p.title || 'Senza titolo'"></h1>
+                <p class="text-sm text-gray-500">
+                    <span x-text="p.owner_name"></span> · <span x-text="p.category || 'Nessuna categoria'"></span>
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="px-3 py-1 text-xs font-semibold rounded-full" :class="statusClass(p.status)" x-text="statusLabel(p.status)"></span>
+            <button @click="deleteProduct()" class="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Elimina</button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- LEFT: Images + AI -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <!-- Images Section -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Immagini</h2>
+                    <label class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 cursor-pointer">
+                        + Aggiungi foto
+                        <input type="file" multiple accept="image/*" @change="uploadImages($event)" class="hidden">
+                    </label>
+                </div>
+
+                <div x-show="p.images && p.images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <template x-for="img in p.images" :key="img.id">
+                        <div class="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+                            <img :src="'/' + (img.processed || img.original)" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                                <button @click="deleteImage(img.id)" class="bg-red-500 text-white rounded-full w-7 h-7 text-xs flex items-center justify-center">✕</button>
+                            </div>
+                            <div x-show="img.is_primary" class="absolute bottom-0 left-0 right-0 bg-indigo-600 text-white text-xs text-center py-0.5">Principale</div>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="!p.images || p.images.length === 0" class="text-center py-8 text-gray-400">
+                    <div class="text-4xl mb-2">📷</div>
+                    <p class="text-sm">Nessuna immagine caricata</p>
+                </div>
+            </div>
+
+            <!-- AI Analysis -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Analisi AI</h2>
+                    <button @click="analyzeAI()" :disabled="aiLoading"
+                            class="px-3 py-1.5 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
+                        <span x-show="!aiLoading">🤖 Analizza con Gemini</span>
+                        <span x-show="aiLoading">Analisi in corso...</span>
+                    </button>
+                </div>
+
+                <div x-show="p.ai_detected_object" class="bg-purple-50 rounded-lg p-4 text-sm space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Oggetto:</span>
+                        <span class="font-medium" x-text="p.ai_detected_object"></span>
+                    </div>
+                    <div class="flex justify-between" x-show="p.ai_confidence">
+                        <span class="text-gray-600">Confidenza:</span>
+                        <span class="font-medium" x-text="((p.ai_confidence || 0) * 100).toFixed(0) + '%'"></span>
+                    </div>
+                    <div class="flex justify-between" x-show="p.price_ai_suggested">
+                        <span class="text-gray-600">Prezzo suggerito:</span>
+                        <span class="font-bold text-purple-600">€<span x-text="p.price_ai_suggested"></span></span>
+                    </div>
+                </div>
+                <div x-show="!p.ai_detected_object" class="text-center py-6 text-gray-400">
+                    <p class="text-sm">Carica almeno una foto e clicca "Analizza con Gemini"</p>
+                </div>
+            </div>
+
+            <!-- Generated Descriptions -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Descrizioni Generate</h2>
+                    <button @click="generateDescriptions()" :disabled="descLoading"
+                            class="px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                        <span x-show="!descLoading">✍️ Genera Descrizioni</span>
+                        <span x-show="descLoading">Generazione...</span>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Subito -->
+                    <div x-show="p.desc_subito" class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-orange-600 uppercase">Subito.it</span>
+                            <button @click="copyText(p.desc_subito)" class="text-xs text-gray-500 hover:text-indigo-600">📋 Copia</button>
+                        </div>
+                        <div class="text-sm text-gray-700 whitespace-pre-wrap" x-text="p.desc_subito"></div>
+                        <textarea x-model="p.desc_subito" rows="3" class="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none hidden" :class="editing === 'subito' && '!block'" ></textarea>
+                        <button @click="editing = editing === 'subito' ? null : 'subito'" class="text-xs text-indigo-600 mt-1">
+                            <span x-text="editing === 'subito' ? 'Chiudi' : '✏️ Modifica'"></span>
+                        </button>
+                    </div>
+
+                    <!-- eBay -->
+                    <div x-show="p.desc_ebay" class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-blue-600 uppercase">eBay</span>
+                            <button @click="copyText(p.desc_ebay)" class="text-xs text-gray-500 hover:text-indigo-600">📋 Copia</button>
+                        </div>
+                        <div class="text-sm text-gray-700 whitespace-pre-wrap" x-text="p.desc_ebay"></div>
+                        <textarea x-model="p.desc_ebay" rows="3" class="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none hidden" :class="editing === 'ebay' && '!block'"></textarea>
+                        <button @click="editing = editing === 'ebay' ? null : 'ebay'" class="text-xs text-indigo-600 mt-1">
+                            <span x-text="editing === 'ebay' ? 'Chiudi' : '✏️ Modifica'"></span>
+                        </button>
+                    </div>
+
+                    <!-- Vinted -->
+                    <div x-show="p.desc_vinted" class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-teal-600 uppercase">Vinted</span>
+                            <button @click="copyText(p.desc_vinted)" class="text-xs text-gray-500 hover:text-indigo-600">📋 Copia</button>
+                        </div>
+                        <div class="text-sm text-gray-700 whitespace-pre-wrap" x-text="p.desc_vinted"></div>
+                        <textarea x-model="p.desc_vinted" rows="3" class="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none hidden" :class="editing === 'vinted' && '!block'"></textarea>
+                        <button @click="editing = editing === 'vinted' ? null : 'vinted'" class="text-xs text-indigo-600 mt-1">
+                            <span x-text="editing === 'vinted' ? 'Chiudi' : '✏️ Modifica'"></span>
+                        </button>
+                    </div>
+
+                    <div x-show="!p.desc_subito && !p.desc_ebay && !p.desc_vinted" class="text-center py-6 text-gray-400">
+                        <p class="text-sm">Clicca "Genera Descrizioni" per creare testi ottimizzati per ogni piattaforma</p>
+                    </div>
+
+                    <button x-show="p.desc_subito || p.desc_ebay || p.desc_vinted"
+                            @click="saveDescriptions()"
+                            class="px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        💾 Salva Descrizioni Modificate
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Info + Publications + Actions -->
+        <div class="space-y-6">
+
+            <!-- Product Info Card (Editable) -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Dati Prodotto</h2>
+                    <button @click="editMode = !editMode" class="text-xs text-indigo-600">
+                        <span x-text="editMode ? '✕ Chiudi' : '✏️ Modifica'"></span>
+                    </button>
+                </div>
+
+                <!-- View Mode -->
+                <div x-show="!editMode" class="space-y-3 text-sm">
+                    <div class="flex justify-between"><span class="text-gray-500">Titolo</span><span class="font-medium text-right max-w-[60%] truncate" x-text="p.title || '—'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Categoria</span><span class="font-medium" x-text="p.category || '—'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Condizione</span><span class="font-medium" x-text="p.condition || '—'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Prezzo iniziale</span><span class="font-medium" x-text="p.price_initial ? '€' + p.price_initial : '—'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Prezzo vendita</span><span class="font-medium" x-text="p.price_listed ? '€' + p.price_listed : '—'"></span></div>
+                    <div class="flex justify-between" x-show="p.price_ai_suggested"><span class="text-gray-500">Suggerito AI</span><span class="font-medium text-purple-600" x-text="'€' + p.price_ai_suggested"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Dimensioni</span><span class="font-medium" x-text="p.dimensions || '—'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Logistica</span><span class="font-medium" x-text="logisticsLabel(p.logistics_status)"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Urgenza</span><span class="font-medium" x-text="p.urgency || '—'"></span></div>
+                    <div x-show="p.defects"><span class="text-gray-500 block">Difetti:</span><span class="text-gray-700" x-text="p.defects"></span></div>
+                    <div x-show="p.notes"><span class="text-gray-500 block">Note:</span><span class="text-gray-700" x-text="p.notes"></span></div>
+                </div>
+
+                <!-- Edit Mode -->
+                <div x-show="editMode" x-cloak class="space-y-3">
+                    <div>
+                        <label class="text-xs text-gray-500">Titolo</label>
+                        <input type="text" x-model="editForm.title" class="w-full px-2 py-1.5 text-sm border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Categoria</label>
+                        <input type="text" x-model="editForm.category" class="w-full px-2 py-1.5 text-sm border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Condizione</label>
+                        <select x-model="editForm.condition" class="w-full px-2 py-1.5 text-sm border rounded-lg">
+                            <option value="">—</option>
+                            <option value="nuovo">Nuovo</option>
+                            <option value="come_nuovo">Come nuovo</option>
+                            <option value="buono">Buono</option>
+                            <option value="usato">Usato</option>
+                            <option value="difettoso">Difettoso</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs text-gray-500">Prezzo iniziale</label>
+                            <input type="number" step="0.01" x-model.number="editForm.price_initial" class="w-full px-2 py-1.5 text-sm border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500">Prezzo vendita</label>
+                            <input type="number" step="0.01" x-model.number="editForm.price_listed" class="w-full px-2 py-1.5 text-sm border rounded-lg">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Stato</label>
+                        <select x-model="editForm.status" class="w-full px-2 py-1.5 text-sm border rounded-lg">
+                            <option value="draft">Bozza</option>
+                            <option value="ready">Pronto</option>
+                            <option value="listed">In vendita</option>
+                            <option value="negotiating">Trattativa</option>
+                            <option value="sold">Venduto</option>
+                            <option value="archived">Archiviato</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Note</label>
+                        <textarea x-model="editForm.notes" rows="2" class="w-full px-2 py-1.5 text-sm border rounded-lg"></textarea>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-500">Difetti</label>
+                        <textarea x-model="editForm.defects" rows="2" class="w-full px-2 py-1.5 text-sm border rounded-lg"></textarea>
+                    </div>
+                    <button @click="saveEdit()" class="w-full px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salva</button>
+                </div>
+            </div>
+
+            <!-- Publication per Platform -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Pubblicazione</h2>
+
+                <div class="space-y-3">
+                    <template x-for="platform in ['subito', 'ebay', 'vinted', 'facebook']" :key="platform">
+                        <div class="border border-gray-200 rounded-lg p-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-semibold capitalize" x-text="platform"></span>
+                                <span class="text-xs px-2 py-0.5 rounded-full"
+                                      :class="pubStatus(platform).class"
+                                      x-text="pubStatus(platform).label"></span>
+                            </div>
+                            <div class="mt-2 flex gap-2">
+                                <input type="text" :placeholder="'Link ' + platform + '...'"
+                                       x-model="pubLinks[platform]"
+                                       class="flex-1 px-2 py-1 text-xs border rounded-lg">
+                                <button @click="savePub(platform)"
+                                        class="px-2 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700">Salva</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Price History -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6" x-show="priceHistory.length > 0">
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Storico Prezzi</h2>
+                <div class="space-y-2">
+                    <template x-for="ph in priceHistory" :key="ph.id">
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500" x-text="ph.reason"></span>
+                            <div>
+                                <span class="font-medium" x-text="'€' + ph.price"></span>
+                                <span class="text-xs text-gray-400 ml-2" x-text="new Date(ph.created_at).toLocaleDateString('it-IT')"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Azioni Rapide</h2>
+                <div class="space-y-2">
+                    <button @click="setStatus('listed')" x-show="p.status !== 'listed' && p.status !== 'sold'"
+                            class="w-full px-3 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700">🟢 Metti in vendita</button>
+                    <button @click="setStatus('negotiating')" x-show="p.status === 'listed'"
+                            class="w-full px-3 py-2 text-sm font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">🟡 In trattativa</button>
+                    <button @click="markSold()" x-show="p.status !== 'sold'"
+                            class="w-full px-3 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">💰 Segna come venduto</button>
+                    <button @click="setStatus('archived')" x-show="p.status !== 'archived'"
+                            class="w-full px-3 py-2 text-sm font-medium bg-gray-500 text-white rounded-lg hover:bg-gray-600">📦 Archivia</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function productDetail() {
+    return {
+        p: {{ product_json | safe }},
+        priceHistory: {{ price_history_json | safe }},
+        publications: {{ publications_json | safe }},
+        editMode: false,
+        editForm: {},
+        editing: null,
+        aiLoading: false,
+        descLoading: false,
+        pubLinks: { subito: '', ebay: '', vinted: '', facebook: '' },
+
+        init() {
+            this.editForm = { ...this.p };
+            for (const pub of this.publications) {
+                this.pubLinks[pub.platform] = pub.link || '';
+            }
+        },
+
+        statusLabel(s) {
+            return { draft: 'Bozza', ready: 'Pronto', listed: 'In vendita', negotiating: 'Trattativa', sold: 'Venduto', archived: 'Archiviato' }[s] || s;
+        },
+        statusClass(s) {
+            return {
+                draft: 'bg-gray-100 text-gray-700', ready: 'bg-blue-100 text-blue-700', listed: 'bg-green-100 text-green-700',
+                negotiating: 'bg-yellow-100 text-yellow-700', sold: 'bg-emerald-100 text-emerald-700', archived: 'bg-gray-100 text-gray-500'
+            }[s] || 'bg-gray-100 text-gray-700';
+        },
+        logisticsLabel(s) {
+            return { da_ritirare: 'Da ritirare', ritirato: 'Ritirato', in_magazzino: 'In magazzino', spedito: 'Spedito' }[s] || '—';
+        },
+
+        pubStatus(platform) {
+            const pub = this.publications.find(p => p.platform === platform);
+            if (!pub) return { label: 'Non pubblicato', class: 'bg-gray-100 text-gray-600' };
+            const map = {
+                pending: { label: 'In attesa', class: 'bg-yellow-100 text-yellow-700' },
+                published: { label: 'Pubblicato', class: 'bg-green-100 text-green-700' },
+                paused: { label: 'In pausa', class: 'bg-orange-100 text-orange-700' },
+                removed: { label: 'Rimosso', class: 'bg-red-100 text-red-700' },
+            };
+            return map[pub.status] || { label: pub.status, class: 'bg-gray-100 text-gray-600' };
+        },
+
+        async analyzeAI() {
+            if (!this.p.images || this.p.images.length === 0) { toast('Carica almeno una foto', 'error'); return; }
+            this.aiLoading = true;
+            try {
+                const res = await api(`/api/products/${this.p.id}/analyze`, { method: 'POST' });
+                this.p = res.product;
+                this.editForm = { ...this.p };
+                toast('Analisi completata!');
+            } catch (e) { toast(e.message, 'error'); }
+            finally { this.aiLoading = false; }
+        },
+
+        async generateDescriptions() {
+            this.descLoading = true;
+            try {
+                const res = await api(`/api/products/${this.p.id}/generate-descriptions`, { method: 'POST' });
+                this.p = res.product;
+                toast('Descrizioni generate!');
+            } catch (e) { toast(e.message, 'error'); }
+            finally { this.descLoading = false; }
+        },
+
+        async saveDescriptions() {
+            try {
+                this.p = await api(`/api/products/${this.p.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        desc_subito: this.p.desc_subito,
+                        desc_ebay: this.p.desc_ebay,
+                        desc_vinted: this.p.desc_vinted,
+                    })
+                });
+                toast('Descrizioni salvate!');
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        async saveEdit() {
+            try {
+                this.p = await api(`/api/products/${this.p.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(this.editForm)
+                });
+                this.editMode = false;
+                toast('Salvato!');
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        async setStatus(status) {
+            try {
+                this.p = await api(`/api/products/${this.p.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status })
+                });
+                toast('Stato aggiornato!');
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        async markSold() {
+            const price = prompt('Prezzo di vendita (€):');
+            if (!price) return;
+            try {
+                this.p = await api(`/api/products/${this.p.id}/sold`, {
+                    method: 'POST',
+                    body: JSON.stringify({ price_sold: parseFloat(price) })
+                });
+                toast('Prodotto venduto!');
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        async uploadImages(e) {
+            for (const file of e.target.files) {
+                const fd = new FormData();
+                fd.append('file', file);
+                fd.append('is_primary', (!this.p.images || this.p.images.length === 0) ? 'true' : 'false');
+                try {
+                    await fetch(`/api/products/${this.p.id}/upload`, { method: 'POST', body: fd });
+                } catch (e) { toast('Errore upload', 'error'); return; }
+            }
+            this.p = await api(`/api/products/${this.p.id}`);
+            toast('Immagini caricate!');
+        },
+
+        async deleteImage(imgId) {
+            if (!confirm('Eliminare questa immagine?')) return;
+            try {
+                await api(`/api/products/${this.p.id}/images/${imgId}`, { method: 'DELETE' });
+                this.p = await api(`/api/products/${this.p.id}`);
+                toast('Immagine eliminata');
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        async savePub(platform) {
+            try {
+                const existing = this.publications.find(p => p.platform === platform);
+                if (existing) {
+                    await api(`/api/products/${this.p.id}/publications/${existing.id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ link: this.pubLinks[platform], status: this.pubLinks[platform] ? 'published' : 'pending' })
+                    });
+                } else {
+                    await api(`/api/products/${this.p.id}/publications/`, {
+                        method: 'POST',
+                        body: JSON.stringify({ platform, link: this.pubLinks[platform], status: this.pubLinks[platform] ? 'published' : 'pending' })
+                    });
+                }
+                const res = await fetch(`/api/products/${this.p.id}/publications/`);
+                this.publications = await res.json();
+                toast('Pubblicazione salvata!');
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        async deleteProduct() {
+            if (!confirm('Eliminare definitivamente questo prodotto?')) return;
+            try {
+                await api(`/api/products/${this.p.id}`, { method: 'DELETE' });
+                window.location.href = '/panel';
+            } catch (e) { toast(e.message, 'error'); }
+        },
+
+        copyText(text) {
+            navigator.clipboard.writeText(text);
+            toast('Copiato negli appunti!');
+        }
+    };
+}
+</script>
+{% endblock %}

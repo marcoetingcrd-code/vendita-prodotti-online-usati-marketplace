@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 
 
 async def init_db():
-    from app.models.product import Product, ProductImage, PriceHistory, ActivityLog
+    from app.models.product import Product, ProductImage, PriceHistory, ActivityLog, Publication
     from app.models.owner import Owner
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

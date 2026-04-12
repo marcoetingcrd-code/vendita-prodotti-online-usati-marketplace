@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Prodotti Usati{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-gray-50 font-sans text-gray-900">
+
+<!-- Navbar -->
+<nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-14">
+            <div class="flex items-center gap-6">
+                <a href="/panel" class="flex items-center gap-2 text-lg font-bold text-indigo-600">
+                    <span>📦</span> Prodotti Usati
+                </a>
+                <div class="hidden sm:flex items-center gap-1">
+                    <a href="/panel" class="px-3 py-1.5 text-sm font-medium rounded-md {% if active_page == 'dashboard' %}bg-indigo-50 text-indigo-700{% else %}text-gray-600 hover:bg-gray-100{% endif %}">Dashboard</a>
+                    <a href="/panel/prodotti/nuovo" class="px-3 py-1.5 text-sm font-medium rounded-md {% if active_page == 'new' %}bg-indigo-50 text-indigo-700{% else %}text-gray-600 hover:bg-gray-100{% endif %}">+ Nuovo</a>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="hidden sm:inline text-xs text-gray-400">v2.0</span>
+                <a href="/docs" target="_blank" class="text-xs text-gray-500 hover:text-indigo-600">API Docs</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Flash Messages -->
+{% if flash_message %}
+<div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)"
+     class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+    <div class="rounded-lg px-4 py-3 text-sm font-medium
+        {% if flash_type == 'success' %}bg-green-50 text-green-800 border border-green-200
+        {% elif flash_type == 'error' %}bg-red-50 text-red-800 border border-red-200
+        {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+        {{ flash_message }}
+    </div>
+</div>
+{% endif %}
+
+<!-- Content -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    {% block content %}{% endblock %}
+</main>
+
+<!-- Toast Notification -->
+<div id="toast" x-data="{ show: false, message: '', type: 'success' }"
+     x-on:toast.window="message = $event.detail.message; type = $event.detail.type || 'success'; show = true; setTimeout(() => show = false, 3000)"
+     x-show="show" x-cloak
+     x-transition
+     class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
+     :class="type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'">
+    <span x-text="message"></span>
+</div>
+
+<script>
+function toast(message, type = 'success') {
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
+}
+
+async function api(url, options = {}) {
+    const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        ...options
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Errore sconosciuto' }));
+        throw new Error(err.detail || 'Errore');
+    }
+    return res.json();
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

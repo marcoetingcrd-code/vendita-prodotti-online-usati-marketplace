@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Prodotti Usati{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="init()">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Dashboard Prodotti</h1>
+            <p class="text-sm text-gray-500 mt-1">
+                <span x-text="products.length"></span> prodotti totali
+            </p>
+        </div>
+        <a href="/panel/prodotti/nuovo"
+           class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition shadow-sm">
+            <span>+</span> Nuovo Prodotto
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Bozze</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1" x-text="stats.draft"></p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">In vendita</p>
+            <p class="text-2xl font-bold text-indigo-600 mt-1" x-text="stats.listed"></p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Venduti</p>
+            <p class="text-2xl font-bold text-green-600 mt-1" x-text="stats.sold"></p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Ricavo</p>
+            <p class="text-2xl font-bold text-green-600 mt-1">€<span x-text="stats.revenue.toFixed(0)"></span></p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1">
+                <input type="text" placeholder="🔍 Cerca per nome..."
+                       x-model="search" @input.debounce.300ms="filterProducts()"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            </div>
+            <select x-model="filterOwner" @change="filterProducts()"
+                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="">Tutti i proprietari</option>
+                {% for owner in owners %}
+                <option value="{{ owner.id }}">{{ owner.name }}</option>
+                {% endfor %}
+            </select>
+            <select x-model="filterStatus" @change="filterProducts()"
+                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="">Tutti gli stati</option>
+                <option value="draft">📝 Bozza</option>
+                <option value="ready">✅ Pronto</option>
+                <option value="listed">🟢 In vendita</option>
+                <option value="negotiating">🟡 Trattativa</option>
+                <option value="sold">💰 Venduto</option>
+                <option value="archived">📦 Archiviato</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Product Grid -->
+    <div x-show="filtered.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <template x-for="p in filtered" :key="p.id">
+            <a :href="'/panel/prodotti/' + p.id"
+               class="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition group">
+                <!-- Image -->
+                <div class="aspect-square bg-gray-100 relative overflow-hidden">
+                    <template x-if="p.images && p.images.length > 0">
+                        <img :src="'/' + (p.images[0].processed || p.images[0].original)"
+                             class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                             loading="lazy">
+                    </template>
+                    <template x-if="!p.images || p.images.length === 0">
+                        <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">📷</div>
+                    </template>
+                    <!-- Status Badge -->
+                    <span class="absolute top-2 right-2 px-2 py-0.5 text-xs font-semibold rounded-full"
+                          :class="statusClass(p.status)"
+                          x-text="statusLabel(p.status)"></span>
+                </div>
+                <!-- Info -->
+                <div class="p-3">
+                    <h3 class="font-semibold text-sm text-gray-900 truncate" x-text="p.title || 'Senza titolo'"></h3>
+                    <p class="text-xs text-gray-500 mt-0.5" x-text="p.owner_name || 'Nessun proprietario'"></p>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-sm font-bold text-indigo-600" x-text="formatPrice(p)"></span>
+                        <span class="text-xs text-gray-400" x-text="formatDate(p.created_at)"></span>
+                    </div>
+                </div>
+            </a>
+        </template>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="filtered.length === 0 && !loading" class="text-center py-16">
+        <div class="text-5xl mb-4">📦</div>
+        <h3 class="text-lg font-semibold text-gray-900">Nessun prodotto trovato</h3>
+        <p class="text-sm text-gray-500 mt-1">Modifica i filtri o crea un nuovo prodotto</p>
+        <a href="/panel/prodotti/nuovo"
+           class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
+            + Nuovo Prodotto
+        </a>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="text-center py-16">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
+        <p class="text-sm text-gray-500 mt-3">Caricamento...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboard() {
+    return {
+        products: [],
+        filtered: [],
+        loading: true,
+        search: '',
+        filterOwner: '',
+        filterStatus: '',
+        stats: { draft: 0, listed: 0, sold: 0, revenue: 0 },
+
+        async init() {
+            try {
+                this.products = await api('/api/products/');
+                this.computeStats();
+                this.filterProducts();
+            } catch (e) {
+                toast('Errore caricamento prodotti', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        computeStats() {
+            this.stats.draft = this.products.filter(p => p.status === 'draft' || p.status === 'ready').length;
+            this.stats.listed = this.products.filter(p => p.status === 'listed' || p.status === 'negotiating').length;
+            this.stats.sold = this.products.filter(p => p.status === 'sold').length;
+            this.stats.revenue = this.products.filter(p => p.status === 'sold').reduce((sum, p) => sum + (p.price_sold || 0), 0);
+        },
+
+        filterProducts() {
+            this.filtered = this.products.filter(p => {
+                if (this.filterOwner && p.owner_id !== this.filterOwner) return false;
+                if (this.filterStatus && p.status !== this.filterStatus) return false;
+                if (this.search) {
+                    const q = this.search.toLowerCase();
+                    const title = (p.title || '').toLowerCase();
+                    const category = (p.category || '').toLowerCase();
+                    if (!title.includes(q) && !category.includes(q)) return false;
+                }
+                return true;
+            });
+        },
+
+        statusLabel(s) {
+            const map = { draft: 'Bozza', ready: 'Pronto', listed: 'In vendita', negotiating: 'Trattativa', sold: 'Venduto', archived: 'Archiviato' };
+            return map[s] || s;
+        },
+
+        statusClass(s) {
+            const map = {
+                draft: 'bg-gray-100 text-gray-700',
+                ready: 'bg-blue-100 text-blue-700',
+                listed: 'bg-green-100 text-green-700',
+                negotiating: 'bg-yellow-100 text-yellow-700',
+                sold: 'bg-emerald-100 text-emerald-700',
+                archived: 'bg-gray-100 text-gray-500',
+            };
+            return map[s] || 'bg-gray-100 text-gray-700';
+        },
+
+        formatPrice(p) {
+            const price = p.price_sold || p.price_listed || p.price_initial || p.price_ai_suggested;
+            return price ? '€' + price.toFixed(0) : '—';
+        },
+
+        formatDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -2,6 +2,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from telegram import Update
 from app.config import HOST, PORT, BASE_URL, UPLOAD_DIR, TELEGRAM_BOT_TOKEN
@@ -9,6 +10,7 @@ from app.database import init_db
 from app.api.products import router as products_router
 from app.api.owners import router as owners_router
 from app.api.stats import router as stats_router
+from app.web.routes import router as web_router
 from app.bot.handler import create_bot_app, get_bot_app
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -56,15 +58,13 @@ app.include_router(products_router)
 app.include_router(owners_router)
 app.include_router(stats_router)
 
+# Web Panel
+app.include_router(web_router)
+
 
 @app.get("/")
 async def root():
-    return {
-        "name": "Unified Marketplace Hub",
-        "version": "1.0.0",
-        "status": "running",
-        "docs": f"{BASE_URL}/docs",
-    }
+    return RedirectResponse(url="/panel")
 
 
 @app.get("/health")
