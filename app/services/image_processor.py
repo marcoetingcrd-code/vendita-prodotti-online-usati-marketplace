@@ -19,16 +19,18 @@ BG_COLOR = (245, 245, 245)  # Grigio chiaro, stile studio
 def save_original(image_bytes: bytes, extension: str = ".jpg") -> str:
     """Salva l'immagine originale e restituisce il path."""
     filename = f"{uuid.uuid4().hex}{extension}"
-    path = ORIGINALS_DIR / filename
+    path = (ORIGINALS_DIR / filename).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(image_bytes)
-    return str(path.relative_to(BASE_DIR))
+    return str(path.relative_to(BASE_DIR.resolve()))
 
 
 def process_image(original_path: str) -> str:
     """Pipeline completa: rimozione sfondo → crop → luci → resize.
     Restituisce il path dell'immagine processata."""
 
-    full_path = Path(original_path) if Path(original_path).is_absolute() else BASE_DIR / original_path
+    p = Path(original_path)
+    full_path = p if p.is_absolute() else (BASE_DIR / p).resolve()
     img_bytes = full_path.read_bytes()
 
     # 1. Rimozione sfondo con rembg
@@ -57,23 +59,26 @@ def process_image(original_path: str) -> str:
 
     # 7. Salva
     filename = f"{uuid.uuid4().hex}_clean.jpg"
-    output_path = PROCESSED_DIR / filename
+    output_path = (PROCESSED_DIR / filename).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     composite.save(str(output_path), "JPEG", quality=92)
 
-    return str(output_path.relative_to(BASE_DIR))
+    return str(output_path.relative_to(BASE_DIR.resolve()))
 
 
 def resize_for_platform(processed_path: str, platform: str) -> str:
     """Resize un'immagine già processata per una piattaforma specifica."""
     size = PLATFORM_SIZES.get(platform, PLATFORM_SIZES["default"])
-    full_path = Path(processed_path) if Path(processed_path).is_absolute() else BASE_DIR / processed_path
+    p = Path(processed_path)
+    full_path = p if p.is_absolute() else (BASE_DIR / p).resolve()
     img = Image.open(str(full_path))
     img = ImageOps.fit(img, size, method=Image.LANCZOS)
 
     filename = f"{uuid.uuid4().hex}_{platform}.jpg"
-    output_path = PROCESSED_DIR / filename
+    output_path = (PROCESSED_DIR / filename).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(str(output_path), "JPEG", quality=90)
-    return str(output_path.relative_to(BASE_DIR))
+    return str(output_path.relative_to(BASE_DIR.resolve()))
 
 
 def _auto_crop(img: Image.Image, bg_color: tuple, threshold: int = 30) -> Image.Image:
