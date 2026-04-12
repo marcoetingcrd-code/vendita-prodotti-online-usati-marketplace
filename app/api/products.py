@@ -86,8 +86,9 @@ async def create_product(data: ProductCreate, db: AsyncSession = Depends(get_db)
     if not owner:
         raise HTTPException(404, "Owner non trovato")
 
-    product = Product(**data.model_dump())
+    product = Product(**data.model_dump(exclude_none=True))
     db.add(product)
+    await db.flush()
 
     if data.price_initial:
         db.add(PriceHistory(product_id=product.id, price=data.price_initial, reason="initial"))

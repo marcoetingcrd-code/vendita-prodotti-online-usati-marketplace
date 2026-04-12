@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageOps
 from rembg import remove
-from app.config import ORIGINALS_DIR, PROCESSED_DIR
+from app.config import BASE_DIR, ORIGINALS_DIR, PROCESSED_DIR
 
 
 PLATFORM_SIZES = {
@@ -21,14 +21,15 @@ def save_original(image_bytes: bytes, extension: str = ".jpg") -> str:
     filename = f"{uuid.uuid4().hex}{extension}"
     path = ORIGINALS_DIR / filename
     path.write_bytes(image_bytes)
-    return str(path)
+    return str(path.relative_to(BASE_DIR))
 
 
 def process_image(original_path: str) -> str:
     """Pipeline completa: rimozione sfondo → crop → luci → resize.
     Restituisce il path dell'immagine processata."""
 
-    img_bytes = Path(original_path).read_bytes()
+    full_path = Path(original_path) if Path(original_path).is_absolute() else BASE_DIR / original_path
+    img_bytes = full_path.read_bytes()
 
     # 1. Rimozione sfondo con rembg
     result_bytes = remove(img_bytes)
@@ -59,19 +60,20 @@ def process_image(original_path: str) -> str:
     output_path = PROCESSED_DIR / filename
     composite.save(str(output_path), "JPEG", quality=92)
 
-    return str(output_path)
+    return str(output_path.relative_to(BASE_DIR))
 
 
 def resize_for_platform(processed_path: str, platform: str) -> str:
     """Resize un'immagine già processata per una piattaforma specifica."""
     size = PLATFORM_SIZES.get(platform, PLATFORM_SIZES["default"])
-    img = Image.open(processed_path)
+    full_path = Path(processed_path) if Path(processed_path).is_absolute() else BASE_DIR / processed_path
+    img = Image.open(str(full_path))
     img = ImageOps.fit(img, size, method=Image.LANCZOS)
 
     filename = f"{uuid.uuid4().hex}_{platform}.jpg"
     output_path = PROCESSED_DIR / filename
     img.save(str(output_path), "JPEG", quality=90)
-    return str(output_path)
+    return str(output_path.relative_to(BASE_DIR))
 
 
 def _auto_crop(img: Image.Image, bg_color: tuple, threshold: int = 30) -> Image.Image:

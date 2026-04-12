@@ -2,7 +2,7 @@ import json
 import base64
 from pathlib import Path
 import google.generativeai as genai
-from app.config import GEMINI_API_KEY
+from app.config import GEMINI_API_KEY, BASE_DIR
 
 _configured = False
 
@@ -19,7 +19,8 @@ async def analyze_product_image(image_path: str) -> dict:
     Restituisce: oggetto riconosciuto, categoria, condizione, dimensioni stimate, prezzo suggerito."""
     _ensure_configured()
 
-    img_bytes = Path(image_path).read_bytes()
+    full_path = Path(image_path) if Path(image_path).is_absolute() else BASE_DIR / image_path
+    img_bytes = full_path.read_bytes()
     img_b64 = base64.b64encode(img_bytes).decode()
     mime = "image/jpeg" if image_path.lower().endswith((".jpg", ".jpeg")) else "image/png"
 
