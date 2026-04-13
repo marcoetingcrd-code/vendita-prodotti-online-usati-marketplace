@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 _client = None
 TEXT_MODEL = "gemini-2.0-flash"
-IMAGE_MODEL = "gemini-2.0-flash-exp"
+IMAGE_MODEL = "gemini-2.5-flash-image"
 
 
 def _get_client():
