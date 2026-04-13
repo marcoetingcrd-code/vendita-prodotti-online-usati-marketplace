@@ -132,6 +132,46 @@
             </div>
         </div>
 
+        <!-- Active Publications -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Pubblicazioni attive</h2>
+                <a href="/panel/account" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">Gestisci account →</a>
+            </div>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div x-show="activePubs.length === 0" class="p-8 text-center text-gray-400">
+                    <div class="text-3xl mb-2">📢</div>
+                    <p class="text-sm">Nessuna pubblicazione attiva</p>
+                    <p class="text-xs mt-1">Pubblica un prodotto per vederlo qui</p>
+                </div>
+                <div class="divide-y divide-gray-50 max-h-[450px] overflow-y-auto">
+                    <template x-for="pub in activePubs" :key="pub.id">
+                        <div class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition group">
+                            <span class="flex-shrink-0" x-html="platformLogo(pub.platform, 24)"></span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <a :href="'/panel/prodotti/' + pub.product_id" class="text-sm font-semibold text-gray-900 hover:text-indigo-600 truncate" x-text="pub.product_title"></a>
+                                    <span x-show="pub.account_name" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500" x-text="pub.account_name"></span>
+                                </div>
+                                <div class="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                                    <span x-show="pub.price_published">€<span x-text="pub.price_published"></span></span>
+                                    <span x-show="pub.views_count != null">👁 <span x-text="pub.views_count"></span></span>
+                                    <span x-show="pub.messages_count != null">💬 <span x-text="pub.messages_count"></span></span>
+                                    <span x-show="pub.last_checked_at" class="text-green-600">✓ <span x-text="timeAgo(pub.last_checked_at)"></span></span>
+                                    <span x-show="!pub.last_checked_at" class="text-amber-600">⚠ Mai verificato</span>
+                                </div>
+                            </div>
+                            <a x-show="pub.link" :href="pub.link" target="_blank"
+                               class="flex-shrink-0 px-3 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm opacity-80 group-hover:opacity-100 transition">
+                                🔗 Verifica
+                            </a>
+                            <span x-show="!pub.link" class="flex-shrink-0 text-xs text-gray-400">Nessun link</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
         <!-- Inbox Compact -->
         <div>
             <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Inbox recente</h2>
@@ -172,22 +212,25 @@ function dashboardPage() {
         alerts: [],
         timeline: [],
         conversations: [],
+        activePubs: [],
         loading: true,
 
         async init() {
             try {
-                const [stats, plat, alerts, timeline, convs] = await Promise.all([
+                const [stats, plat, alerts, timeline, convs, pubs] = await Promise.all([
                     api('/api/dashboard/stats'),
                     api('/api/dashboard/platform-stats'),
                     api('/api/dashboard/alerts'),
                     api('/api/dashboard/timeline'),
                     api('/api/conversations/?unread_only=false').catch(() => []),
+                    api('/api/dashboard/active-publications').catch(() => []),
                 ]);
                 this.stats = stats;
                 this.platforms = plat;
                 this.alerts = alerts;
                 this.timeline = timeline;
                 this.conversations = convs.slice(0, 10);
+                this.activePubs = pubs;
             } catch (e) {
                 toast('Errore caricamento dashboard', 'error');
             } finally { this.loading = false; }

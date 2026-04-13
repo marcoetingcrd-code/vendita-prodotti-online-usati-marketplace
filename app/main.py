@@ -14,6 +14,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.conversations import router as conversations_router
 from app.api.events import router as events_router
 from app.api.search import router as search_router
+from app.api.platform_accounts import router as platform_accounts_router
 from app.web.routes import router as web_router
 from app.bot.handler import create_bot_app, get_bot_app
 from app.services.email_ingest import email_hub_loop, is_configured as email_hub_configured
@@ -77,6 +78,7 @@ app.include_router(dashboard_router)
 app.include_router(conversations_router)
 app.include_router(events_router)
 app.include_router(search_router)
+app.include_router(platform_accounts_router)
 
 # Web Panel
 app.include_router(web_router)

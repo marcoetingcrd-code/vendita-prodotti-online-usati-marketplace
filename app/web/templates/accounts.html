@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Account Piattaforme — Sales Command Center{% endblock %}
+
+{% block content %}
+<div x-data="accountsPage()" x-init="load()">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-extrabold text-gray-900">Account Piattaforme</h1>
+        <button @click="showAdd = true" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition shadow-sm">
+            + Nuovo Account
+        </button>
+    </div>
+
+    <!-- Add Form -->
+    <div x-show="showAdd" x-cloak class="bg-white rounded-2xl border border-gray-200 p-6 mb-6 shadow-sm">
+        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Aggiungi Account</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <label class="text-xs font-medium text-gray-600 mb-1 block">Piattaforma *</label>
+                <select x-model="newAcc.platform" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="">Seleziona...</option>
+                    <option value="subito">Subito</option>
+                    <option value="ebay">eBay</option>
+                    <option value="vinted">Vinted</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="vestiaire">Vestiaire Collective</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-600 mb-1 block">Nome Account *</label>
+                <input type="text" x-model="newAcc.account_name" placeholder="Es: Marco Personale"
+                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-600 mb-1 block">Label breve</label>
+                <input type="text" x-model="newAcc.account_label" placeholder="Es: Marco"
+                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-600 mb-1 block">Link pannello vendite</label>
+                <input type="url" x-model="newAcc.login_url" placeholder="https://..."
+                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+                <label class="text-xs font-medium text-gray-600 mb-1 block">Link profilo pubblico</label>
+                <input type="url" x-model="newAcc.profile_url" placeholder="https://..."
+                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-600 mb-1 block">Note</label>
+                <input type="text" x-model="newAcc.notes" placeholder="Note..."
+                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button @click="addAccount()" :disabled="!newAcc.platform || !newAcc.account_name"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition">Salva</button>
+            <button @click="showAdd = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Annulla</button>
+        </div>
+    </div>
+
+    <!-- Accounts grouped by platform -->
+    <template x-for="platform in ['subito','ebay','vinted','facebook','vestiaire']" :key="platform">
+        <div x-show="accountsByPlatform(platform).length > 0" class="mb-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span x-html="platformLogo(platform, 24)"></span>
+                <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider" x-text="platform"></h2>
+                <span class="text-xs text-gray-400" x-text="accountsByPlatform(platform).length + ' account'"></span>
+            </div>
+            <div class="space-y-2">
+                <template x-for="acc in accountsByPlatform(platform)" :key="acc.id">
+                    <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4 hover:shadow-sm transition group">
+                        <!-- Info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-semibold text-gray-900" x-text="acc.account_name"></span>
+                                <span x-show="acc.account_label" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500" x-text="acc.account_label"></span>
+                                <span x-show="!acc.is_active" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-600">Disattivo</span>
+                            </div>
+                            <div x-show="acc.notes" class="text-xs text-gray-500 mt-0.5" x-text="acc.notes"></div>
+                        </div>
+                        <!-- Actions -->
+                        <div class="flex items-center gap-2 opacity-70 group-hover:opacity-100 transition">
+                            <a x-show="acc.login_url" :href="acc.login_url" target="_blank"
+                               class="px-3 py-1.5 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition"
+                               title="Apri pannello vendite">
+                                🔗 Pannello Vendite
+                            </a>
+                            <a x-show="acc.profile_url" :href="acc.profile_url" target="_blank"
+                               class="px-3 py-1.5 text-xs font-medium bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                                👤 Profilo
+                            </a>
+                            <button @click="toggleActive(acc)" class="px-2 py-1.5 text-xs rounded-lg transition"
+                                    :class="acc.is_active ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'"
+                                    x-text="acc.is_active ? '✓ Attivo' : '✕ Disattivo'"></button>
+                            <button @click="deleteAccount(acc.id)" class="px-2 py-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">🗑</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <!-- Empty state -->
+    <div x-show="accounts.length === 0 && !loading" class="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+        <div class="text-5xl mb-3">🏪</div>
+        <p class="text-lg font-semibold text-gray-700">Nessun account configurato</p>
+        <p class="text-sm text-gray-500 mt-1">Aggiungi i tuoi profili di vendita per gestire le pubblicazioni</p>
+        <button @click="showAdd = true" class="mt-4 px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition">
+            + Aggiungi il primo account
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function accountsPage() {
+    return {
+        accounts: [],
+        loading: true,
+        showAdd: false,
+        newAcc: { platform: '', account_name: '', account_label: '', login_url: '', profile_url: '', notes: '' },
+
+        async load() {
+            try {
+                this.accounts = await api('/api/platform-accounts/');
+            } catch(e) { toast('Errore caricamento', 'error'); }
+            finally { this.loading = false; }
+        },
+
+        accountsByPlatform(p) {
+            return this.accounts.filter(a => a.platform === p);
+        },
+
+        async addAccount() {
+            try {
+                await api('/api/platform-accounts/', { method: 'POST', body: JSON.stringify(this.newAcc) });
+                this.newAcc = { platform: '', account_name: '', account_label: '', login_url: '', profile_url: '', notes: '' };
+                this.showAdd = false;
+                await this.load();
+                toast('Account aggiunto!');
+            } catch(e) { toast(e.message, 'error'); }
+        },
+
+        async toggleActive(acc) {
+            try {
+                await api(`/api/platform-accounts/${acc.id}`, {
+                    method: 'PATCH', body: JSON.stringify({ is_active: !acc.is_active })
+                });
+                await this.load();
+            } catch(e) { toast(e.message, 'error'); }
+        },
+
+        async deleteAccount(id) {
+            if (!confirm('Eliminare questo account?')) return;
+            try {
+                await api(`/api/platform-accounts/${id}`, { method: 'DELETE' });
+                await this.load();
+                toast('Account eliminato');
+            } catch(e) { toast(e.message, 'error'); }
+        },
+    };
+}
+</script>
+{% endblock %}

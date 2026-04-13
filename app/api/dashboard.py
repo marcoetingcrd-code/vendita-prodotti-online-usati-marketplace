@@ -4,6 +4,7 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.product import Product, ProductImage, Publication
+from app.models.platform_account import PlatformAccount
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.event import Event
@@ -199,3 +200,53 @@ async def poll(db: AsyncSession = Depends(get_db)):
         "latest_event_at": latest_event.created_at.isoformat() if latest_event else None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.get("/active-publications")
+async def active_publications(platform: str | None = None, db: AsyncSession = Depends(get_db)):
+    """Pubblicazioni attive con prodotto e account, ordinate per meno verificate."""
+    query = (
+        select(Publication)
+        .where(Publication.status.in_(["published", "pending"]))
+        .order_by(Publication.last_checked_at.asc().nullsfirst(), Publication.created_at.desc())
+    )
+    if platform:
+        query = query.where(Publication.platform == platform)
+
+    result = await db.execute(query)
+    pubs = result.scalars().all()
+
+    # Need product titles — load them
+    product_ids = list(set(p.product_id for p in pubs))
+    products_map = {}
+    if product_ids:
+        prod_result = await db.execute(select(Product).where(Product.id.in_(product_ids)))
+        for pr in prod_result.scalars().all():
+            products_map[pr.id] = {
+                "title": pr.title,
+                "price_initial": pr.price_initial,
+                "status": pr.status,
+                "primary_image": next((img.processed_path or img.original_path for img in (pr.images or []) if img.is_primary), None),
+            }
+
+    return [
+        {
+            "id": p.id,
+            "product_id": p.product_id,
+            "product_title": products_map.get(p.product_id, {}).get("title", "—"),
+            "product_price": products_map.get(p.product_id, {}).get("price_initial"),
+            "product_status": products_map.get(p.product_id, {}).get("status"),
+            "product_image": products_map.get(p.product_id, {}).get("primary_image"),
+            "platform": p.platform,
+            "account_id": p.account_id,
+            "account_name": p.account.account_name if p.account else None,
+            "status": p.status,
+            "link": p.link,
+            "price_published": p.price_published,
+            "views_count": p.views_count,
+            "messages_count": p.messages_count,
+            "last_checked_at": p.last_checked_at.isoformat() if p.last_checked_at else None,
+            "published_at": p.published_at.isoformat() if p.published_at else None,
+        }
+        for p in pubs
+    ]

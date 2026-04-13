@@ -101,15 +101,21 @@ class Publication(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
     product_id: Mapped[str] = mapped_column(String, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    platform: Mapped[str] = mapped_column(String, nullable=False)  # subito, ebay, vinted, facebook
-    status: Mapped[str] = mapped_column(String, default="pending")  # pending, published, paused, removed
+    platform: Mapped[str] = mapped_column(String, nullable=False)  # subito, ebay, vinted, facebook, vestiaire
+    account_id: Mapped[str | None] = mapped_column(String, ForeignKey("platform_accounts.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, published, paused, removed, sold
     link: Mapped[str | None] = mapped_column(String)
     notes: Mapped[str | None] = mapped_column(Text)
     is_manual: Mapped[bool] = mapped_column(Boolean, default=True)
+    price_published: Mapped[float | None] = mapped_column(Float)
+    views_count: Mapped[int | None] = mapped_column(Integer)
+    messages_count: Mapped[int | None] = mapped_column(Integer)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     product = relationship("Product", back_populates="publications")
+    account = relationship("PlatformAccount", lazy="selectin")
 
 
 class ActivityLog(Base):

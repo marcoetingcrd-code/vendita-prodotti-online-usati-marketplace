@@ -17,6 +17,7 @@ async def init_db():
     from app.models.message import Message
     from app.models.event import Event
     from app.models.notification import Notification
+    from app.models.platform_account import PlatformAccount
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

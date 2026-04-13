@@ -7,6 +7,7 @@ from pathlib import Path
 from app.database import get_db
 from app.models.product import Product, PriceHistory, Publication
 from app.models.owner import Owner
+from app.models.platform_account import PlatformAccount
 
 router = APIRouter(tags=["web"])
 
@@ -113,8 +114,20 @@ async def product_detail(product_id: str, request: Request, db: AsyncSession = D
     publications = [
         {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link,
          "notes": pub.notes, "is_manual": pub.is_manual,
+         "account_id": pub.account_id,
+         "account_name": pub.account.account_name if pub.account else None,
+         "price_published": pub.price_published,
+         "views_count": pub.views_count, "messages_count": pub.messages_count,
+         "last_checked_at": pub.last_checked_at.isoformat() if pub.last_checked_at else None,
          "published_at": pub.published_at.isoformat() if pub.published_at else None}
         for pub in (product.publications or [])
+    ]
+
+    # Load platform accounts for publication dropdown
+    accs_result = await db.execute(select(PlatformAccount).where(PlatformAccount.is_active == True).order_by(PlatformAccount.platform))
+    platform_accounts = [
+        {"id": a.id, "platform": a.platform, "account_name": a.account_name, "account_label": a.account_label}
+        for a in accs_result.scalars().all()
     ]
 
     return templates.TemplateResponse("product_detail.html", {
@@ -124,6 +137,7 @@ async def product_detail(product_id: str, request: Request, db: AsyncSession = D
         "product_json": json.dumps(product_data),
         "price_history_json": json.dumps(price_history),
         "publications_json": json.dumps(publications),
+        "platform_accounts_json": json.dumps(platform_accounts),
     })
 
 
@@ -140,6 +154,14 @@ async def events_page(request: Request):
     return templates.TemplateResponse("events.html", {
         "request": request,
         "active_page": "events",
+    })
+
+
+@router.get("/panel/account")
+async def accounts_page(request: Request):
+    return templates.TemplateResponse("accounts.html", {
+        "request": request,
+        "active_page": "accounts",
     })
 
 

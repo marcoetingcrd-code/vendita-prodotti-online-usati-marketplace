@@ -356,16 +356,22 @@ async def delete_image(product_id: str, image_id: str, db: AsyncSession = Depend
 
 class PublicationCreate(BaseModel):
     platform: str
+    account_id: str | None = None
     status: str = "pending"
     link: str | None = None
+    price_published: float | None = None
     notes: str | None = None
     is_manual: bool = True
 
 
 class PublicationUpdate(BaseModel):
+    account_id: str | None = None
     status: str | None = None
     link: str | None = None
     notes: str | None = None
+    price_published: float | None = None
+    views_count: int | None = None
+    messages_count: int | None = None
 
 
 @router.get("/{product_id}/publications/")
@@ -373,12 +379,7 @@ async def list_publications(product_id: str, db: AsyncSession = Depends(get_db))
     await _get_or_404(db, product_id)
     result = await db.execute(select(Publication).where(Publication.product_id == product_id))
     pubs = result.scalars().all()
-    return [
-        {"id": p.id, "platform": p.platform, "status": p.status, "link": p.link,
-         "notes": p.notes, "is_manual": p.is_manual,
-         "published_at": p.published_at.isoformat() if p.published_at else None}
-        for p in pubs
-    ]
+    return [_serialize_pub(p) for p in pubs]
 
 
 @router.post("/{product_id}/publications/")
@@ -387,10 +388,12 @@ async def create_publication(product_id: str, data: PublicationCreate, db: Async
     pub = Publication(
         product_id=product_id,
         platform=data.platform,
+        account_id=data.account_id,
         status=data.status,
         link=data.link,
         notes=data.notes,
         is_manual=data.is_manual,
+        price_published=data.price_published,
         published_at=datetime.now(timezone.utc) if data.status == "published" else None,
     )
     db.add(pub)
@@ -399,7 +402,7 @@ async def create_publication(product_id: str, data: PublicationCreate, db: Async
                  description=f"Stato: {data.status}" + (f", Link: {data.link}" if data.link else "")))
     await db.commit()
     await db.refresh(pub)
-    return {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
+    return _serialize_pub(pub)
 
 
 @router.patch("/{product_id}/publications/{pub_id}")
@@ -415,7 +418,40 @@ async def update_publication(product_id: str, pub_id: str, data: PublicationUpda
         pub.published_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(pub)
-    return {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
+    return _serialize_pub(pub)
+
+
+@router.patch("/{product_id}/publications/{pub_id}/check")
+async def check_publication(product_id: str, pub_id: str, db: AsyncSession = Depends(get_db)):
+    """Segna la pubblicazione come verificata ora."""
+    await _get_or_404(db, product_id)
+    pub = await db.get(Publication, pub_id)
+    if not pub or pub.product_id != product_id:
+        raise HTTPException(404, "Pubblicazione non trovata")
+    pub.last_checked_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(pub)
+    return _serialize_pub(pub)
+
+
+def _serialize_pub(p: Publication) -> dict:
+    return {
+        "id": p.id,
+        "product_id": p.product_id,
+        "platform": p.platform,
+        "account_id": p.account_id,
+        "account_name": p.account.account_name if p.account else None,
+        "status": p.status,
+        "link": p.link,
+        "notes": p.notes,
+        "is_manual": p.is_manual,
+        "price_published": p.price_published,
+        "views_count": p.views_count,
+        "messages_count": p.messages_count,
+        "last_checked_at": p.last_checked_at.isoformat() if p.last_checked_at else None,
+        "published_at": p.published_at.isoformat() if p.published_at else None,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+    }
 
 
 async def _get_or_404(db: AsyncSession, product_id: str) -> Product:
@@ -465,7 +501,12 @@ def _serialize_product(p: Product) -> dict:
             for img in (p.images or [])
         ],
         "publications": [
-            {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
+            {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link,
+             "account_id": pub.account_id, "account_name": pub.account.account_name if pub.account else None,
+             "price_published": pub.price_published, "views_count": pub.views_count,
+             "messages_count": pub.messages_count,
+             "last_checked_at": pub.last_checked_at.isoformat() if pub.last_checked_at else None,
+             "published_at": pub.published_at.isoformat() if pub.published_at else None}
             for pub in (p.publications or [])
         ],
         "created_at": p.created_at.isoformat() if p.created_at else None,
