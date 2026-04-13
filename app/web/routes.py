@@ -126,7 +126,8 @@ async def product_detail(product_id: str, request: Request, db: AsyncSession = D
     # Load platform accounts for publication dropdown
     accs_result = await db.execute(select(PlatformAccount).where(PlatformAccount.is_active == True).order_by(PlatformAccount.platform))
     platform_accounts = [
-        {"id": a.id, "platform": a.platform, "account_name": a.account_name, "account_label": a.account_label}
+        {"id": a.id, "platform": a.platform, "account_name": a.account_name,
+         "account_label": a.account_label, "login_url": a.login_url, "profile_url": a.profile_url}
         for a in accs_result.scalars().all()
     ]
 
