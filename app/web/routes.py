@@ -64,10 +64,18 @@ async def _get_owners(db: AsyncSession) -> list[dict]:
 
 @router.get("/panel")
 async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
-    owners = await _get_owners(db)
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "active_page": "dashboard",
+    })
+
+
+@router.get("/panel/prodotti")
+async def products_list(request: Request, db: AsyncSession = Depends(get_db)):
+    owners = await _get_owners(db)
+    return templates.TemplateResponse("products.html", {
+        "request": request,
+        "active_page": "products",
         "owners": owners,
     })
 
@@ -77,7 +85,7 @@ async def product_new(request: Request, db: AsyncSession = Depends(get_db)):
     owners = await _get_owners(db)
     return templates.TemplateResponse("product_new.html", {
         "request": request,
-        "active_page": "new",
+        "active_page": "products",
         "owners": owners,
     })
 
@@ -110,9 +118,36 @@ async def product_detail(product_id: str, request: Request, db: AsyncSession = D
 
     return templates.TemplateResponse("product_detail.html", {
         "request": request,
-        "active_page": "detail",
+        "active_page": "products",
         "product": product_data,
         "product_json": json.dumps(product_data),
         "price_history_json": json.dumps(price_history),
         "publications_json": json.dumps(publications),
+    })
+
+
+@router.get("/panel/inbox")
+async def inbox(request: Request):
+    return templates.TemplateResponse("inbox.html", {
+        "request": request,
+        "active_page": "inbox",
+    })
+
+
+@router.get("/panel/eventi")
+async def events_page(request: Request):
+    return templates.TemplateResponse("events.html", {
+        "request": request,
+        "active_page": "events",
+    })
+
+
+@router.get("/panel/proprietari")
+async def owners_page(request: Request, db: AsyncSession = Depends(get_db)):
+    owners = await _get_owners(db)
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "active_page": "owners",
+        "flash_message": "Pagina proprietari in costruzione. Usa API /api/owners/",
+        "flash_type": "info",
     })

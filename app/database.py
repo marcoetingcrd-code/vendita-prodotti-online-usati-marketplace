@@ -13,6 +13,10 @@ class Base(DeclarativeBase):
 async def init_db():
     from app.models.product import Product, ProductImage, PriceHistory, ActivityLog, Publication
     from app.models.owner import Owner
+    from app.models.conversation import Conversation
+    from app.models.message import Message
+    from app.models.event import Event
+    from app.models.notification import Notification
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

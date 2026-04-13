@@ -1,194 +1,220 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Prodotti Usati{% endblock %}
+{% block title %}Dashboard — Sales Command Center{% endblock %}
 
 {% block content %}
-<div x-data="dashboard()" x-init="init()">
+<div x-data="dashboardPage()" x-init="init()">
 
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Dashboard Prodotti</h1>
-            <p class="text-sm text-gray-500 mt-1">
-                <span x-text="products.length"></span> prodotti totali
-            </p>
+            <h1 class="text-2xl font-extrabold text-gray-900">Dashboard</h1>
+            <p class="text-sm text-gray-500 mt-0.5">Cosa richiede attenzione adesso?</p>
         </div>
         <a href="/panel/prodotti/nuovo"
-           class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition shadow-sm">
-            <span>+</span> Nuovo Prodotto
-        </a>
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Bozze</p>
-            <p class="text-2xl font-bold text-gray-900 mt-1" x-text="stats.draft"></p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">In vendita</p>
-            <p class="text-2xl font-bold text-indigo-600 mt-1" x-text="stats.listed"></p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Venduti</p>
-            <p class="text-2xl font-bold text-green-600 mt-1" x-text="stats.sold"></p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Ricavo</p>
-            <p class="text-2xl font-bold text-green-600 mt-1">€<span x-text="stats.revenue.toFixed(0)"></span></p>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <div class="flex flex-col sm:flex-row gap-3">
-            <div class="flex-1">
-                <input type="text" placeholder="🔍 Cerca per nome..."
-                       x-model="search" @input.debounce.300ms="filterProducts()"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-            </div>
-            <select x-model="filterOwner" @change="filterProducts()"
-                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                <option value="">Tutti i proprietari</option>
-                {% for owner in owners %}
-                <option value="{{ owner.id }}">{{ owner.name }}</option>
-                {% endfor %}
-            </select>
-            <select x-model="filterStatus" @change="filterProducts()"
-                    class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                <option value="">Tutti gli stati</option>
-                <option value="draft">📝 Bozza</option>
-                <option value="ready">✅ Pronto</option>
-                <option value="listed">🟢 In vendita</option>
-                <option value="negotiating">🟡 Trattativa</option>
-                <option value="sold">💰 Venduto</option>
-                <option value="archived">📦 Archiviato</option>
-            </select>
-        </div>
-    </div>
-
-    <!-- Product Grid -->
-    <div x-show="filtered.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <template x-for="p in filtered" :key="p.id">
-            <a :href="'/panel/prodotti/' + p.id"
-               class="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-300 transition group">
-                <!-- Image -->
-                <div class="aspect-square bg-gray-100 relative overflow-hidden">
-                    <template x-if="p.images && p.images.length > 0">
-                        <img :src="'/' + (p.images[0].processed || p.images[0].original)"
-                             class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                             loading="lazy">
-                    </template>
-                    <template x-if="!p.images || p.images.length === 0">
-                        <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">📷</div>
-                    </template>
-                    <!-- Status Badge -->
-                    <span class="absolute top-2 right-2 px-2 py-0.5 text-xs font-semibold rounded-full"
-                          :class="statusClass(p.status)"
-                          x-text="statusLabel(p.status)"></span>
-                </div>
-                <!-- Info -->
-                <div class="p-3">
-                    <h3 class="font-semibold text-sm text-gray-900 truncate" x-text="p.title || 'Senza titolo'"></h3>
-                    <p class="text-xs text-gray-500 mt-0.5" x-text="p.owner_name || 'Nessun proprietario'"></p>
-                    <div class="flex items-center justify-between mt-2">
-                        <span class="text-sm font-bold text-indigo-600" x-text="formatPrice(p)"></span>
-                        <span class="text-xs text-gray-400" x-text="formatDate(p.created_at)"></span>
-                    </div>
-                </div>
-            </a>
-        </template>
-    </div>
-
-    <!-- Empty State -->
-    <div x-show="filtered.length === 0 && !loading" class="text-center py-16">
-        <div class="text-5xl mb-4">📦</div>
-        <h3 class="text-lg font-semibold text-gray-900">Nessun prodotto trovato</h3>
-        <p class="text-sm text-gray-500 mt-1">Modifica i filtri o crea un nuovo prodotto</p>
-        <a href="/panel/prodotti/nuovo"
-           class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
+           class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition shadow-sm">
             + Nuovo Prodotto
         </a>
     </div>
 
-    <!-- Loading -->
-    <div x-show="loading" class="text-center py-16">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
-        <p class="text-sm text-gray-500 mt-3">Caricamento...</p>
+    <!-- A: KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Prodotti attivi</p>
+                <span class="text-2xl">📦</span>
+            </div>
+            <p class="text-3xl font-extrabold text-gray-900 mt-2" x-text="stats.active_products"></p>
+            <p class="text-xs text-gray-400 mt-1">+<span x-text="stats.active_trend_7d"></span> ultimi 7gg</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Messaggi nuovi</p>
+                <span class="text-2xl">📨</span>
+            </div>
+            <p class="text-3xl font-extrabold mt-2" :class="stats.unread_messages > 0 ? 'text-red-600' : 'text-gray-900'" x-text="stats.unread_messages"></p>
+            <p class="text-xs text-gray-400 mt-1"><span x-text="stats.unread_today"></span> arrivati oggi</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Trattative aperte</p>
+                <span class="text-2xl">🤝</span>
+            </div>
+            <p class="text-3xl font-extrabold text-amber-600 mt-2" x-text="stats.open_negotiations"></p>
+            <p class="text-xs text-gray-400 mt-1"><span x-text="stats.hot_conversations"></span> calde · <span x-text="stats.stale_conversations"></span> ferme 48h+</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Vendite mese</p>
+                <span class="text-2xl">💰</span>
+            </div>
+            <p class="text-3xl font-extrabold text-green-600 mt-2">€<span x-text="stats.revenue_month?.toFixed(0) || 0"></span></p>
+            <p class="text-xs text-gray-400 mt-1"><span x-text="stats.sold_month"></span> prodotti venduti</p>
+        </div>
+    </div>
+
+    <!-- B: Platform Cards -->
+    <div class="mb-6">
+        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Piattaforme</h2>
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <template x-for="name in ['subito','ebay','vinted','facebook']" :key="name">
+                <a :href="'/panel/prodotti?platform=' + name"
+                   class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-md hover:border-indigo-300 transition cursor-pointer">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-xl" x-text="platformIcon(name)"></span>
+                        <span class="text-sm font-bold capitalize" x-text="name"></span>
+                    </div>
+                    <div class="space-y-1.5 text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Pubblicati</span><span class="font-bold" x-text="(platforms[name]||{}).published || 0"></span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Messaggi</span>
+                            <span class="font-bold" :class="(platforms[name]||{}).open_messages > 0 ? 'text-red-600' : ''" x-text="(platforms[name]||{}).open_messages || 0"></span>
+                        </div>
+                        <div class="flex justify-between"><span class="text-gray-500">Conversazioni</span><span class="font-bold" x-text="(platforms[name]||{}).conversations || 0"></span></div>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-400 truncate" x-text="(platforms[name]||{}).last_event || 'Nessun evento'"></div>
+                </a>
+            </template>
+            <!-- Totale -->
+            <div class="bg-indigo-50 rounded-2xl border border-indigo-200 p-4 shadow-sm">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-xl">�</span>
+                    <span class="text-sm font-bold text-indigo-700">Totale</span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                    <div class="flex justify-between"><span class="text-gray-500">Prodotti</span><span class="font-bold text-indigo-700" x-text="stats.total_products"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Bozze</span><span class="font-bold" x-text="stats.drafts"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">Non letti</span><span class="font-bold text-red-600" x-text="stats.unread_messages"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- C: Alerts -->
+    <div x-show="alerts.length > 0" class="mb-6">
+        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Alert operativi</h2>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+            <template x-for="a in alerts" :key="a.type">
+                <div class="flex items-center gap-4 px-5 py-3.5">
+                    <span class="flex-shrink-0 w-2.5 h-2.5 rounded-full"
+                          :class="a.severity === 'high' ? 'bg-red-500' : a.severity === 'medium' ? 'bg-amber-400' : 'bg-blue-400'"></span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900" x-text="a.title"></p>
+                        <p class="text-xs text-gray-500 truncate" x-text="a.detail"></p>
+                    </div>
+                    <a :href="a.action_url" class="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition" x-text="a.action_label"></a>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- D+E: Timeline + Inbox -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Timeline -->
+        <div>
+            <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Timeline eventi</h2>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div x-show="timeline.length === 0" class="p-8 text-center text-gray-400">
+                    <div class="text-3xl mb-2">⚡</div>
+                    <p class="text-sm">Nessun evento recente</p>
+                </div>
+                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+                    <template x-for="e in timeline" :key="e.id">
+                        <div class="flex items-start gap-3 px-5 py-3">
+                            <span class="flex-shrink-0 text-base mt-0.5" x-text="eventIcon(e.type)"></span>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900" x-text="e.title"></p>
+                                <p class="text-xs text-gray-500 truncate" x-text="e.description || ''"></p>
+                            </div>
+                            <span class="flex-shrink-0 text-[10px] text-gray-400 whitespace-nowrap" x-text="timeAgo(e.created_at)"></span>
+                        </div>
+                    </template>
+                </div>
+                <a href="/panel/eventi" class="block px-5 py-3 text-center text-xs font-semibold text-indigo-600 border-t border-gray-100 hover:bg-gray-50 rounded-b-2xl">Vedi tutti gli eventi →</a>
+            </div>
+        </div>
+
+        <!-- Inbox Compact -->
+        <div>
+            <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Inbox recente</h2>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div x-show="conversations.length === 0" class="p-8 text-center text-gray-400">
+                    <div class="text-3xl mb-2">�</div>
+                    <p class="text-sm">Nessuna conversazione</p>
+                    <p class="text-xs mt-1">Configura l'Email Hub per ricevere messaggi</p>
+                </div>
+                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+                    <template x-for="c in conversations" :key="c.id">
+                        <a :href="'/panel/inbox?id=' + c.id" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
+                            <span class="flex-shrink-0 text-base" x-text="platformIcon(c.platform)"></span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-semibold text-gray-900" x-text="c.contact_name || 'Sconosciuto'"></span>
+                                    <span x-show="c.unread_count" class="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" x-text="c.unread_count"></span>
+                                </div>
+                                <p class="text-xs text-gray-500 truncate" x-text="c.last_message_preview || 'Nessun messaggio'"></p>
+                            </div>
+                            <span class="flex-shrink-0 text-[10px] text-gray-400" x-text="timeAgo(c.last_message_at)"></span>
+                        </a>
+                    </template>
+                </div>
+                <a href="/panel/inbox" class="block px-5 py-3 text-center text-xs font-semibold text-indigo-600 border-t border-gray-100 hover:bg-gray-50 rounded-b-2xl">Apri Inbox completa →</a>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function dashboard() {
+function dashboardPage() {
     return {
-        products: [],
-        filtered: [],
+        stats: {},
+        platforms: {},
+        alerts: [],
+        timeline: [],
+        conversations: [],
         loading: true,
-        search: '',
-        filterOwner: '',
-        filterStatus: '',
-        stats: { draft: 0, listed: 0, sold: 0, revenue: 0 },
 
         async init() {
             try {
-                this.products = await api('/api/products/');
-                this.computeStats();
-                this.filterProducts();
+                const [stats, plat, alerts, timeline, convs] = await Promise.all([
+                    api('/api/dashboard/stats'),
+                    api('/api/dashboard/platform-stats'),
+                    api('/api/dashboard/alerts'),
+                    api('/api/dashboard/timeline'),
+                    api('/api/conversations/?unread_only=false').catch(() => []),
+                ]);
+                this.stats = stats;
+                this.platforms = plat;
+                this.alerts = alerts;
+                this.timeline = timeline;
+                this.conversations = convs.slice(0, 10);
             } catch (e) {
-                toast('Errore caricamento prodotti', 'error');
-            } finally {
-                this.loading = false;
-            }
+                toast('Errore caricamento dashboard', 'error');
+            } finally { this.loading = false; }
         },
 
-        computeStats() {
-            this.stats.draft = this.products.filter(p => p.status === 'draft' || p.status === 'ready').length;
-            this.stats.listed = this.products.filter(p => p.status === 'listed' || p.status === 'negotiating').length;
-            this.stats.sold = this.products.filter(p => p.status === 'sold').length;
-            this.stats.revenue = this.products.filter(p => p.status === 'sold').reduce((sum, p) => sum + (p.price_sold || 0), 0);
+        platformIcon(p) {
+            return { subito: '🟠', ebay: '🔵', vinted: '🟢', facebook: '🔷', telegram: '✈️' }[p] || '📱';
         },
-
-        filterProducts() {
-            this.filtered = this.products.filter(p => {
-                if (this.filterOwner && p.owner_id !== this.filterOwner) return false;
-                if (this.filterStatus && p.status !== this.filterStatus) return false;
-                if (this.search) {
-                    const q = this.search.toLowerCase();
-                    const title = (p.title || '').toLowerCase();
-                    const category = (p.category || '').toLowerCase();
-                    if (!title.includes(q) && !category.includes(q)) return false;
-                }
-                return true;
-            });
-        },
-
-        statusLabel(s) {
-            const map = { draft: 'Bozza', ready: 'Pronto', listed: 'In vendita', negotiating: 'Trattativa', sold: 'Venduto', archived: 'Archiviato' };
-            return map[s] || s;
-        },
-
-        statusClass(s) {
+        eventIcon(t) {
             const map = {
-                draft: 'bg-gray-100 text-gray-700',
-                ready: 'bg-blue-100 text-blue-700',
-                listed: 'bg-green-100 text-green-700',
-                negotiating: 'bg-yellow-100 text-yellow-700',
-                sold: 'bg-emerald-100 text-emerald-700',
-                archived: 'bg-gray-100 text-gray-500',
+                product_created: '📦', product_updated: '✏️', product_sold: '💰',
+                image_uploaded: '📸', ai_analyzed: '🤖', description_generated: '✍️',
+                publication_created: '📢', message_received: '📨', message_sent: '📤',
+                conversation_created: '💬', email_ingested: '📧', system_error: '🔴',
             };
-            return map[s] || 'bg-gray-100 text-gray-700';
+            return map[t] || '⚡';
         },
-
-        formatPrice(p) {
-            const price = p.price_sold || p.price_listed || p.price_initial || p.price_ai_suggested;
-            return price ? '€' + price.toFixed(0) : '—';
-        },
-
-        formatDate(iso) {
+        timeAgo(iso) {
             if (!iso) return '';
-            const d = new Date(iso);
-            return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+            const diff = Date.now() - new Date(iso).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'ora';
+            if (mins < 60) return mins + 'min';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h';
+            const days = Math.floor(hrs / 24);
+            return days + 'gg';
         }
     };
 }

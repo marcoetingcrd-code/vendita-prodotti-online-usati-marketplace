@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Prodotti — Sales Command Center{% endblock %}
+
+{% block content %}
+<div x-data="productsPage()" x-init="init()">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-extrabold text-gray-900">Prodotti</h1>
+            <p class="text-sm text-gray-500 mt-0.5"><span x-text="filtered.length"></span> prodotti trovati</p>
+        </div>
+        <a href="/panel/prodotti/nuovo"
+           class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition shadow-sm">
+            + Nuovo Prodotto
+        </a>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-sm">
+        <div class="flex flex-wrap gap-3 items-center">
+            <input type="text" placeholder="🔍 Cerca..." x-model="search" @input.debounce.300ms="filter()"
+                   class="flex-1 min-w-[200px] px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            <select x-model="filterOwner" @change="filter()"
+                    class="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="">Tutti i proprietari</option>
+                {% for owner in owners %}
+                <option value="{{ owner.id }}">{{ owner.name }}</option>
+                {% endfor %}
+            </select>
+            <select x-model="filterStatus" @change="filter()"
+                    class="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="">Tutti gli stati</option>
+                <option value="draft">📝 Bozza</option>
+                <option value="ready">✅ Pronto</option>
+                <option value="listed">🟢 In vendita</option>
+                <option value="negotiating">🟡 Trattativa</option>
+                <option value="sold">💰 Venduto</option>
+                <option value="archived">📦 Archiviato</option>
+            </select>
+            <select x-model="filterQuality" @change="filter()"
+                    class="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="">Qualità scheda</option>
+                <option value="red">🔴 Incompleta</option>
+                <option value="yellow">🟡 Quasi pronta</option>
+                <option value="green">🟢 Pronta</option>
+            </select>
+            <select x-model="sortBy" @change="filter()"
+                    class="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="newest">Più recenti</option>
+                <option value="oldest">Più vecchi</option>
+                <option value="price_high">Prezzo ↓</option>
+                <option value="price_low">Prezzo ↑</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Product Card-Rows -->
+    <div class="space-y-2">
+        <template x-for="p in filtered" :key="p.id">
+            <a :href="'/panel/prodotti/' + p.id"
+               class="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition flex items-center gap-4 p-3 group">
+                <!-- Thumbnail -->
+                <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                    <template x-if="p.images && p.images.length > 0">
+                        <img :src="'/' + (p.images[0].processed || p.images[0].original)"
+                             class="w-full h-full object-cover" loading="lazy">
+                    </template>
+                    <template x-if="!p.images || !p.images.length">
+                        <div class="w-full h-full flex items-center justify-center text-gray-400 text-xl">📷</div>
+                    </template>
+                </div>
+
+                <!-- Info -->
+                <div class="flex-1 min-w-0 grid grid-cols-12 gap-3 items-center">
+                    <!-- Name + Owner -->
+                    <div class="col-span-3 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate group-hover:text-indigo-600" x-text="p.title || 'Senza titolo'"></p>
+                        <p class="text-xs text-gray-500" x-text="p.owner_name || '—'"></p>
+                    </div>
+
+                    <!-- Platforms -->
+                    <div class="col-span-2 flex items-center gap-1">
+                        <template x-for="pub in (p.publications || [])" :key="pub.id">
+                            <span class="text-sm" :title="pub.platform" x-text="platformIcon(pub.platform)"></span>
+                        </template>
+                        <span x-show="!p.publications || !p.publications.length" class="text-xs text-gray-400">—</span>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="col-span-2">
+                        <span class="px-2 py-0.5 text-xs font-semibold rounded-full"
+                              :class="statusClass(p.status)" x-text="statusLabel(p.status)"></span>
+                    </div>
+
+                    <!-- Prices -->
+                    <div class="col-span-2 text-right">
+                        <p class="text-sm font-bold text-gray-900" x-text="formatPrice(p)"></p>
+                        <p class="text-[10px] text-gray-400" x-text="p.price_sold ? 'Venduto' : (p.price_listed ? 'Listino' : 'Iniziale')"></p>
+                    </div>
+
+                    <!-- Quality Badge -->
+                    <div class="col-span-1 flex justify-center">
+                        <span class="w-3 h-3 rounded-full"
+                              :class="qualityColor(p)" :title="'Qualità: ' + qualityScore(p) + '%'"></span>
+                    </div>
+
+                    <!-- Date -->
+                    <div class="col-span-2 text-right">
+                        <p class="text-xs text-gray-500" x-text="formatDate(p.created_at)"></p>
+                        <p class="text-[10px] text-gray-400" x-text="p.images ? p.images.length + ' foto' : '0 foto'"></p>
+                    </div>
+                </div>
+            </a>
+        </template>
+    </div>
+
+    <!-- Empty -->
+    <div x-show="filtered.length === 0 && !loading" class="text-center py-16">
+        <div class="text-5xl mb-4">📦</div>
+        <h3 class="text-lg font-semibold text-gray-900">Nessun prodotto trovato</h3>
+        <p class="text-sm text-gray-500 mt-1">Modifica i filtri o crea un nuovo prodotto</p>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="text-center py-16">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function productsPage() {
+    return {
+        products: [], filtered: [], loading: true,
+        search: '', filterOwner: '', filterStatus: '', filterQuality: '', sortBy: 'newest',
+
+        async init() {
+            try {
+                this.products = await api('/api/products/');
+                this.filter();
+            } catch (e) { toast('Errore caricamento', 'error'); }
+            finally { this.loading = false; }
+        },
+
+        filter() {
+            let r = [...this.products];
+            if (this.filterOwner) r = r.filter(p => p.owner_id === this.filterOwner);
+            if (this.filterStatus) r = r.filter(p => p.status === this.filterStatus);
+            if (this.search) {
+                const q = this.search.toLowerCase();
+                r = r.filter(p => (p.title||'').toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q));
+            }
+            if (this.filterQuality) r = r.filter(p => this.qualityLevel(p) === this.filterQuality);
+            r.sort((a, b) => {
+                if (this.sortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+                if (this.sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+                if (this.sortBy === 'price_high') return (b.price_listed||b.price_initial||0) - (a.price_listed||a.price_initial||0);
+                if (this.sortBy === 'price_low') return (a.price_listed||a.price_initial||0) - (b.price_listed||b.price_initial||0);
+            });
+            this.filtered = r;
+        },
+
+        qualityScore(p) {
+            let s = 0;
+            if (p.title && p.title.length > 3) s += 20;
+            if (p.images && p.images.length > 0) s += 20;
+            if (p.desc_subito || p.desc_ebay || p.desc_vinted) s += 20;
+            if (p.dimensions || p.measurements) s += 20;
+            if (p.publications && p.publications.length > 0) s += 20;
+            return s;
+        },
+        qualityLevel(p) {
+            const s = this.qualityScore(p);
+            return s <= 40 ? 'red' : s <= 70 ? 'yellow' : 'green';
+        },
+        qualityColor(p) {
+            const l = this.qualityLevel(p);
+            return l === 'red' ? 'bg-red-500' : l === 'yellow' ? 'bg-amber-400' : 'bg-green-500';
+        },
+
+        platformIcon(p) { return {subito:'🟠',ebay:'🔵',vinted:'🟢',facebook:'🔷'}[p]||'📱'; },
+        statusLabel(s) { return {draft:'Bozza',ready:'Pronto',listed:'In vendita',negotiating:'Trattativa',sold:'Venduto',archived:'Archiviato'}[s]||s; },
+        statusClass(s) {
+            return {draft:'bg-gray-100 text-gray-700',ready:'bg-blue-100 text-blue-700',listed:'bg-green-100 text-green-700',
+                    negotiating:'bg-yellow-100 text-yellow-700',sold:'bg-emerald-100 text-emerald-700',archived:'bg-gray-100 text-gray-500'}[s]||'bg-gray-100 text-gray-700';
+        },
+        formatPrice(p) {
+            const v = p.price_sold || p.price_listed || p.price_initial;
+            return v ? '€' + v.toFixed(0) : '—';
+        },
+        formatDate(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleDateString('it-IT', {day:'2-digit',month:'short',year:'numeric'});
+        },
+    };
+}
+</script>
+{% endblock %}

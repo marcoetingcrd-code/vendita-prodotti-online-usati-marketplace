@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.models.product import Product, ProductImage, PriceHistory, ActivityLog, Publication
 from app.models.owner import Owner
+from app.models.event import Event
 from app.services import gemini, image_processor
 from app.services.notifications import notify_product_created, notify_product_sold
 
@@ -94,6 +95,9 @@ async def create_product(data: ProductCreate, db: AsyncSession = Depends(get_db)
         db.add(PriceHistory(product_id=product.id, price=data.price_initial, reason="initial"))
 
     db.add(ActivityLog(product_id=product.id, owner_id=data.owner_id, action="created"))
+    db.add(Event(event_type="product_created", product_id=product.id, source="user",
+                 title=f"Prodotto creato: {data.title or 'Senza titolo'}",
+                 description=f"Proprietario: {owner.name}, Prezzo: €{data.price_initial or 0}"))
 
     await db.commit()
     await db.refresh(product)
@@ -171,6 +175,8 @@ async def upload_image(
         is_primary=is_primary,
     )
     db.add(img)
+    db.add(Event(event_type="image_uploaded", product_id=product_id, source="user",
+                 title=f"Immagine caricata per {product.title or product_id[:8]}"))
     await db.commit()
     await db.refresh(img)
 
@@ -303,6 +309,9 @@ async def create_publication(product_id: str, data: PublicationCreate, db: Async
         published_at=datetime.now(timezone.utc) if data.status == "published" else None,
     )
     db.add(pub)
+    db.add(Event(event_type="publication_created", product_id=product_id, publication_id=pub.id,
+                 source="user", title=f"Pubblicazione su {data.platform}",
+                 description=f"Stato: {data.status}" + (f", Link: {data.link}" if data.link else "")))
     await db.commit()
     await db.refresh(pub)
     return {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
@@ -368,6 +377,10 @@ def _serialize_product(p: Product) -> dict:
             {"id": img.id, "original": img.original_path, "processed": img.processed_path,
              "is_primary": img.is_primary, "is_ai_processed": img.is_ai_processed, "is_accepted": img.is_accepted}
             for img in (p.images or [])
+        ],
+        "publications": [
+            {"id": pub.id, "platform": pub.platform, "status": pub.status, "link": pub.link}
+            for pub in (p.publications or [])
         ],
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,

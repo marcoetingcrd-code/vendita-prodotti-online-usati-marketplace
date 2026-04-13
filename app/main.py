@@ -10,8 +10,13 @@ from app.database import init_db
 from app.api.products import router as products_router
 from app.api.owners import router as owners_router
 from app.api.stats import router as stats_router
+from app.api.dashboard import router as dashboard_router
+from app.api.conversations import router as conversations_router
+from app.api.events import router as events_router
+from app.api.search import router as search_router
 from app.web.routes import router as web_router
 from app.bot.handler import create_bot_app, get_bot_app
+from app.services.email_ingest import email_hub_loop, is_configured as email_hub_configured
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -32,7 +37,18 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("TELEGRAM_BOT_TOKEN non configurato — bot disabilitato")
 
+    # Email Hub background task
+    email_task = None
+    if email_hub_configured():
+        logger.info("Avvio Email Hub...")
+        email_task = asyncio.create_task(email_hub_loop())
+    else:
+        logger.info("Email Hub non configurato — disabilitato")
+
     yield
+
+    if email_task:
+        email_task.cancel()
 
     if TELEGRAM_BOT_TOKEN:
         bot_app = get_bot_app()
@@ -44,9 +60,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Unified Marketplace Hub",
-    description="CRM operativo per vendita usato multi-utente",
-    version="1.0.0",
+    title="Sales Command Center",
+    description="Centro di comando vendite multi-piattaforma",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -57,6 +73,10 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.include_router(products_router)
 app.include_router(owners_router)
 app.include_router(stats_router)
+app.include_router(dashboard_router)
+app.include_router(conversations_router)
+app.include_router(events_router)
+app.include_router(search_router)
 
 # Web Panel
 app.include_router(web_router)

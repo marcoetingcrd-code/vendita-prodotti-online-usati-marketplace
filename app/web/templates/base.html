@@ -3,72 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Prodotti Usati{% endblock %}</title>
+    <title>{% block title %}Sales Command Center{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    maxWidth: { 'screen-2xl': '1440px' },
                 }
             }
         }
     </script>
     <style>
         [x-cloak] { display: none !important; }
+        .sidebar-link { @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150; }
+        .sidebar-link.active { @apply bg-white/10 text-white; }
+        .sidebar-link:not(.active) { @apply text-gray-400 hover:text-white hover:bg-white/5; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="h-full bg-gray-50 font-sans text-gray-900">
+<body class="h-full font-sans text-gray-900" x-data="appShell()" x-init="startPolling()">
 
-<!-- Navbar -->
-<nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-14">
-            <div class="flex items-center gap-6">
-                <a href="/panel" class="flex items-center gap-2 text-lg font-bold text-indigo-600">
-                    <span>📦</span> Prodotti Usati
+<div class="flex h-full">
+
+    <!-- Sidebar -->
+    <aside class="w-[248px] bg-gray-900 flex flex-col fixed inset-y-0 z-40 overflow-y-auto">
+        <!-- Logo -->
+        <div class="h-[72px] flex items-center px-5 border-b border-white/10">
+            <a href="/panel" class="flex items-center gap-2.5">
+                <span class="text-2xl">📦</span>
+                <div>
+                    <div class="text-white font-bold text-sm leading-tight">Sales Command</div>
+                    <div class="text-gray-500 text-[10px] font-medium tracking-wider uppercase">Center</div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-3 py-4 space-y-1">
+            <a href="/panel" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
+                <span class="text-lg">📊</span> Dashboard
+            </a>
+            <a href="/panel/prodotti" class="sidebar-link {% if active_page == 'products' %}active{% endif %}">
+                <span class="text-lg">📦</span> Prodotti
+            </a>
+            <a href="/panel/inbox" class="sidebar-link {% if active_page == 'inbox' %}active{% endif %}">
+                <span class="text-lg">📨</span> Inbox
+                <span x-show="poll.unread_messages > 0" x-cloak
+                      class="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                      x-text="poll.unread_messages"></span>
+            </a>
+            <a href="/panel/pubblicazioni" class="sidebar-link {% if active_page == 'publications' %}active{% endif %}">
+                <span class="text-lg">📢</span> Pubblicazioni
+            </a>
+            <a href="/panel/eventi" class="sidebar-link {% if active_page == 'events' %}active{% endif %}">
+                <span class="text-lg">⚡</span> Eventi
+            </a>
+            <a href="/panel/proprietari" class="sidebar-link {% if active_page == 'owners' %}active{% endif %}">
+                <span class="text-lg">👥</span> Proprietari
+            </a>
+
+            <div class="pt-4 mt-4 border-t border-white/10">
+                <a href="/panel/impostazioni" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
+                    <span class="text-lg">⚙️</span> Impostazioni
                 </a>
-                <div class="hidden sm:flex items-center gap-1">
-                    <a href="/panel" class="px-3 py-1.5 text-sm font-medium rounded-md {% if active_page == 'dashboard' %}bg-indigo-50 text-indigo-700{% else %}text-gray-600 hover:bg-gray-100{% endif %}">Dashboard</a>
-                    <a href="/panel/prodotti/nuovo" class="px-3 py-1.5 text-sm font-medium rounded-md {% if active_page == 'new' %}bg-indigo-50 text-indigo-700{% else %}text-gray-600 hover:bg-gray-100{% endif %}">+ Nuovo</a>
+            </div>
+        </nav>
+
+        <!-- Service Status -->
+        <div class="px-4 py-4 border-t border-white/10 space-y-2">
+            <div class="flex items-center gap-2 text-xs">
+                <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                <span class="text-gray-400">Telegram Bot</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+                <span class="w-2 h-2 rounded-full" :class="emailHubConnected ? 'bg-green-400' : 'bg-red-400'"></span>
+                <span class="text-gray-400">Email Hub</span>
+                <span class="text-gray-600 text-[10px]" x-text="emailHubConnected ? 'connesso' : 'non configurato'"></span>
+            </div>
+            <div class="text-[10px] text-gray-600 mt-2">v2.0 — Command Center</div>
+        </div>
+    </aside>
+
+    <!-- Main Area -->
+    <div class="ml-[248px] flex-1 flex flex-col min-h-screen">
+
+        <!-- Header -->
+        <header class="h-[72px] bg-white border-b border-gray-200 sticky top-0 z-30 flex items-center px-6 gap-4">
+            <!-- Search -->
+            <div class="flex-1 max-w-xl relative" x-data="globalSearch()">
+                <input type="text" placeholder="🔍  Cerca prodotti, contatti, piattaforme, ID..."
+                       x-model="query" @input.debounce.400ms="search()" @focus="open = query.length >= 2" @click.away="open = false"
+                       class="w-full pl-4 pr-10 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white outline-none transition">
+                <!-- Search Results Dropdown -->
+                <div x-show="open && (results.products.length || results.conversations.length)" x-cloak
+                     class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50 max-h-80 overflow-y-auto">
+                    <template x-if="results.products.length">
+                        <div>
+                            <div class="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50">Prodotti</div>
+                            <template x-for="p in results.products" :key="p.id">
+                                <a :href="'/panel/prodotti/' + p.id" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
+                                    <span class="text-sm">📦</span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium truncate" x-text="p.title"></div>
+                                        <div class="text-xs text-gray-500" x-text="p.category + ' · ' + p.status"></div>
+                                    </div>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="results.conversations.length">
+                        <div>
+                            <div class="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50">Conversazioni</div>
+                            <template x-for="c in results.conversations" :key="c.id">
+                                <a :href="'/panel/inbox?id=' + c.id" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
+                                    <span class="text-sm">💬</span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium truncate" x-text="c.contact_name || 'Sconosciuto'"></div>
+                                        <div class="text-xs text-gray-500" x-text="c.platform"></div>
+                                    </div>
+                                    <span x-show="c.unread_count" class="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full" x-text="c.unread_count"></span>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </div>
+
+            <!-- Right side -->
             <div class="flex items-center gap-3">
-                <span class="hidden sm:inline text-xs text-gray-400">v2.0</span>
-                <a href="/docs" target="_blank" class="text-xs text-gray-500 hover:text-indigo-600">API Docs</a>
+                <!-- Notifications -->
+                <a href="/panel/inbox" class="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                    <span class="text-xl">🔔</span>
+                    <span x-show="poll.unread_messages > 0" x-cloak
+                          class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full"
+                          x-text="poll.unread_messages"></span>
+                </a>
+
+                <!-- Telegram -->
+                <a href="https://t.me/Organizzatorevendita_bot" target="_blank"
+                   class="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Apri Telegram Bot">
+                    <span class="text-xl">✈️</span>
+                </a>
+
+                <!-- API Docs -->
+                <a href="/docs" target="_blank" class="hidden lg:block px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">API</a>
+            </div>
+        </header>
+
+        <!-- Flash Messages -->
+        {% if flash_message %}
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" class="px-6 pt-4">
+            <div class="rounded-xl px-4 py-3 text-sm font-medium
+                {% if flash_type == 'success' %}bg-green-50 text-green-800 border border-green-200
+                {% elif flash_type == 'error' %}bg-red-50 text-red-800 border border-red-200
+                {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+                {{ flash_message }}
             </div>
         </div>
-    </div>
-</nav>
+        {% endif %}
 
-<!-- Flash Messages -->
-{% if flash_message %}
-<div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)"
-     class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-    <div class="rounded-lg px-4 py-3 text-sm font-medium
-        {% if flash_type == 'success' %}bg-green-50 text-green-800 border border-green-200
-        {% elif flash_type == 'error' %}bg-red-50 text-red-800 border border-red-200
-        {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
-        {{ flash_message }}
+        <!-- Content -->
+        <main class="flex-1 p-6 bg-gray-50">
+            <div class="max-w-screen-2xl mx-auto">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
     </div>
 </div>
-{% endif %}
 
-<!-- Content -->
-<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    {% block content %}{% endblock %}
-</main>
-
-<!-- Toast Notification -->
+<!-- Toast -->
 <div id="toast" x-data="{ show: false, message: '', type: 'success' }"
      x-on:toast.window="message = $event.detail.message; type = $event.detail.type || 'success'; show = true; setTimeout(() => show = false, 3000)"
-     x-show="show" x-cloak
-     x-transition
-     class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
+     x-show="show" x-cloak x-transition
+     class="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold"
      :class="type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'">
     <span x-text="message"></span>
 </div>
@@ -88,6 +202,37 @@ async function api(url, options = {}) {
         throw new Error(err.detail || 'Errore');
     }
     return res.json();
+}
+
+function appShell() {
+    return {
+        poll: { unread_messages: 0, active_products: 0, open_negotiations: 0 },
+        emailHubConnected: false,
+        async startPolling() {
+            await this.doPoll();
+            setInterval(() => this.doPoll(), 20000);
+        },
+        async doPoll() {
+            try {
+                this.poll = await api('/api/dashboard/poll');
+            } catch (e) {}
+        }
+    };
+}
+
+function globalSearch() {
+    return {
+        query: '',
+        open: false,
+        results: { products: [], conversations: [] },
+        async search() {
+            if (this.query.length < 2) { this.open = false; return; }
+            try {
+                this.results = await api('/api/search/?q=' + encodeURIComponent(this.query));
+                this.open = true;
+            } catch (e) { this.open = false; }
+        }
+    };
 }
 </script>
 

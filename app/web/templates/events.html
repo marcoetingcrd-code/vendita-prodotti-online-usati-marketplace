@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Eventi — Sales Command Center{% endblock %}
+
+{% block content %}
+<div x-data="eventsPage()" x-init="init()">
+
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-extrabold text-gray-900">Eventi</h1>
+            <p class="text-sm text-gray-500 mt-0.5">Cronologia completa di tutte le attività</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-sm flex flex-wrap gap-3">
+        <select x-model="filterType" @change="load()" class="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 outline-none">
+            <option value="">Tutti i tipi</option>
+            <option value="product_created">📦 Prodotto creato</option>
+            <option value="product_updated">✏️ Prodotto aggiornato</option>
+            <option value="product_sold">💰 Venduto</option>
+            <option value="image_uploaded">📸 Immagine caricata</option>
+            <option value="ai_analyzed">🤖 Analisi AI</option>
+            <option value="description_generated">✍️ Descrizione generata</option>
+            <option value="publication_created">📢 Pubblicazione</option>
+            <option value="message_received">📨 Messaggio ricevuto</option>
+            <option value="message_sent">📤 Messaggio inviato</option>
+            <option value="conversation_created">💬 Conversazione</option>
+            <option value="email_ingested">📧 Email processata</option>
+        </select>
+        <select x-model="filterSource" @change="load()" class="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 outline-none">
+            <option value="">Tutte le fonti</option>
+            <option value="system">Sistema</option>
+            <option value="user">Utente</option>
+            <option value="email_hub">Email Hub</option>
+            <option value="ai">AI</option>
+            <option value="telegram">Telegram</option>
+        </select>
+    </div>
+
+    <!-- Events Timeline -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm">
+        <div x-show="events.length === 0 && !loading" class="p-12 text-center text-gray-400">
+            <div class="text-4xl mb-3">⚡</div>
+            <p class="text-base font-semibold">Nessun evento trovato</p>
+        </div>
+        <div class="divide-y divide-gray-50">
+            <template x-for="e in events" :key="e.id">
+                <div class="flex items-start gap-4 px-6 py-4">
+                    <span class="flex-shrink-0 text-xl mt-0.5" x-text="eventIcon(e.event_type)"></span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900" x-text="e.title"></p>
+                        <p x-show="e.description" class="text-xs text-gray-500 mt-0.5" x-text="e.description"></p>
+                        <div class="flex items-center gap-3 mt-1.5 text-[10px] text-gray-400">
+                            <span x-text="e.source" class="uppercase tracking-wider"></span>
+                            <span x-show="e.product_id">· <a :href="'/panel/prodotti/' + e.product_id" class="text-indigo-500 hover:underline">Prodotto</a></span>
+                            <span x-show="e.conversation_id">· <a :href="'/panel/inbox?id=' + e.conversation_id" class="text-indigo-500 hover:underline">Conversazione</a></span>
+                        </div>
+                    </div>
+                    <span class="flex-shrink-0 text-xs text-gray-400 whitespace-nowrap" x-text="formatTime(e.created_at)"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function eventsPage() {
+    return {
+        events: [], loading: true, filterType: '', filterSource: '',
+
+        async init() { await this.load(); },
+
+        async load() {
+            this.loading = true;
+            let url = '/api/events/?limit=100';
+            if (this.filterType) url += '&event_type=' + this.filterType;
+            if (this.filterSource) url += '&source=' + this.filterSource;
+            try { this.events = await api(url); } catch(e) { toast('Errore', 'error'); }
+            finally { this.loading = false; }
+        },
+
+        eventIcon(t) {
+            return {product_created:'📦',product_updated:'✏️',product_sold:'💰',image_uploaded:'📸',
+                    ai_analyzed:'🤖',description_generated:'✍️',publication_created:'📢',
+                    message_received:'📨',message_sent:'📤',conversation_created:'💬',
+                    email_ingested:'📧',system_error:'🔴'}[t]||'⚡';
+        },
+        formatTime(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleString('it-IT', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        },
+    };
+}
+</script>
+{% endblock %}

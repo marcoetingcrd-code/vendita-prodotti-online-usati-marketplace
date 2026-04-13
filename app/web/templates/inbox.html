@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Inbox — Sales Command Center{% endblock %}
+
+{% block content %}
+<div x-data="inboxPage()" x-init="init()" class="flex gap-0 -mx-6 -my-6" style="height: calc(100vh - 72px);">
+
+    <!-- Left Panel: Conversations List -->
+    <div class="w-[360px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+        <!-- Filters -->
+        <div class="p-4 border-b border-gray-100 space-y-3">
+            <h2 class="text-lg font-extrabold text-gray-900">Inbox</h2>
+            <div class="flex gap-2 flex-wrap">
+                <button @click="convFilter = ''; loadConversations()" class="px-3 py-1 text-xs font-medium rounded-lg"
+                        :class="convFilter === '' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Tutti</button>
+                <button @click="convFilter = 'unread'; loadConversations()" class="px-3 py-1 text-xs font-medium rounded-lg"
+                        :class="convFilter === 'unread' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Non letti</button>
+                <button @click="convFilter = 'hot'; loadConversations()" class="px-3 py-1 text-xs font-medium rounded-lg"
+                        :class="convFilter === 'hot' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Caldi 🔥</button>
+            </div>
+            <div class="flex gap-2">
+                <template x-for="p in ['subito','ebay','vinted','facebook']" :key="p">
+                    <button @click="platformFilter = platformFilter === p ? '' : p; loadConversations()"
+                            class="px-2 py-1 text-xs rounded-lg" :class="platformFilter === p ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'"
+                            x-text="platformIcon(p)"></button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Conversation List -->
+        <div class="flex-1 overflow-y-auto">
+            <template x-if="conversations.length === 0">
+                <div class="p-8 text-center text-gray-400">
+                    <div class="text-3xl mb-2">📨</div>
+                    <p class="text-sm">Nessuna conversazione</p>
+                </div>
+            </template>
+            <template x-for="c in conversations" :key="c.id">
+                <div @click="selectConv(c.id)" class="flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 transition"
+                     :class="selectedId === c.id ? 'bg-indigo-50 border-l-2 border-l-indigo-600' : 'hover:bg-gray-50'">
+                    <span class="flex-shrink-0 text-xl" x-text="platformIcon(c.platform)"></span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold" :class="c.unread_count ? 'text-gray-900' : 'text-gray-700'" x-text="c.contact_name || 'Sconosciuto'"></span>
+                            <span x-show="c.status === 'hot'" class="text-xs">🔥</span>
+                            <span x-show="c.unread_count" class="ml-auto bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" x-text="c.unread_count"></span>
+                        </div>
+                        <p class="text-xs text-gray-500 truncate" x-text="c.product_title || c.platform"></p>
+                        <p class="text-xs text-gray-400 truncate mt-0.5" x-text="c.last_message_preview || ''"></p>
+                    </div>
+                    <span class="flex-shrink-0 text-[10px] text-gray-400" x-text="timeAgo(c.last_message_at)"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Right Panel: Conversation Detail -->
+    <div class="flex-1 flex flex-col bg-gray-50">
+        <template x-if="!selectedId">
+            <div class="flex-1 flex items-center justify-center text-gray-400">
+                <div class="text-center">
+                    <div class="text-5xl mb-3">💬</div>
+                    <p class="text-lg font-semibold">Seleziona una conversazione</p>
+                    <p class="text-sm mt-1">Scegli una conversazione dalla lista per vedere i dettagli</p>
+                </div>
+            </div>
+        </template>
+        <template x-if="selectedId && detail">
+            <div class="flex-1 flex flex-col">
+                <!-- Conv Header -->
+                <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
+                    <span class="text-2xl" x-text="platformIcon(detail.platform)"></span>
+                    <div class="flex-1">
+                        <h3 class="text-base font-bold text-gray-900" x-text="detail.contact_name || 'Sconosciuto'"></h3>
+                        <div class="flex items-center gap-3 text-xs text-gray-500">
+                            <span x-text="detail.platform" class="capitalize"></span>
+                            <span x-show="detail.product_title">· <a :href="'/panel/prodotti/' + detail.product_id" class="text-indigo-600 hover:underline" x-text="detail.product_title"></a></span>
+                            <span>· <span x-text="detail.message_count"></span> messaggi</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="markRead()" class="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">✓ Letto</button>
+                        <button @click="setStatus('hot')" class="px-3 py-1.5 text-xs font-medium bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100">🔥 Caldo</button>
+                        <button @click="setStatus('closed')" class="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200">✕ Chiudi</button>
+                    </div>
+                </div>
+
+                <!-- Messages Thread -->
+                <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3" x-ref="msgContainer">
+                    <template x-for="m in detail.messages || []" :key="m.id">
+                        <div class="flex" :class="m.direction === 'outgoing' ? 'justify-end' : (m.direction === 'system' ? 'justify-center' : 'justify-start')">
+                            <div class="max-w-[70%] rounded-2xl px-4 py-2.5 text-sm"
+                                 :class="m.direction === 'outgoing' ? 'bg-indigo-600 text-white' : (m.direction === 'system' ? 'bg-gray-200 text-gray-600 text-xs italic' : 'bg-white border border-gray-200 text-gray-900')">
+                                <p x-show="m.subject" class="font-semibold text-xs mb-1 opacity-70" x-text="m.subject"></p>
+                                <p x-text="m.body || '(vuoto)'" style="white-space: pre-wrap;"></p>
+                                <p class="text-[10px] mt-1 opacity-50" x-text="formatTime(m.created_at)"></p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Message Input -->
+                <div class="bg-white border-t border-gray-200 px-6 py-4">
+                    <div class="flex gap-3">
+                        <input type="text" x-model="newMessage" placeholder="Scrivi nota o risposta..."
+                               @keydown.enter="sendMessage()"
+                               class="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <button @click="sendMessage()" :disabled="!newMessage.trim()"
+                                class="px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition">
+                            Invia
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function inboxPage() {
+    return {
+        conversations: [], detail: null, selectedId: null,
+        convFilter: '', platformFilter: '', newMessage: '',
+
+        async init() {
+            await this.loadConversations();
+            const params = new URLSearchParams(location.search);
+            if (params.get('id')) this.selectConv(params.get('id'));
+        },
+
+        async loadConversations() {
+            let url = '/api/conversations/?';
+            if (this.convFilter === 'unread') url += 'unread_only=true&';
+            if (this.convFilter === 'hot') url += 'status=hot&';
+            if (this.platformFilter) url += 'platform=' + this.platformFilter + '&';
+            try { this.conversations = await api(url); } catch(e) {}
+        },
+
+        async selectConv(id) {
+            this.selectedId = id;
+            try {
+                this.detail = await api('/api/conversations/' + id);
+                this.$nextTick(() => {
+                    if (this.$refs.msgContainer) this.$refs.msgContainer.scrollTop = this.$refs.msgContainer.scrollHeight;
+                });
+            } catch(e) { toast('Errore caricamento', 'error'); }
+        },
+
+        async markRead() {
+            try {
+                await api('/api/conversations/' + this.selectedId + '/read', { method: 'POST' });
+                toast('Segnato come letto');
+                await this.loadConversations();
+            } catch(e) {}
+        },
+
+        async setStatus(s) {
+            try {
+                await api('/api/conversations/' + this.selectedId + '?status=' + s, { method: 'PATCH' });
+                toast('Stato aggiornato');
+                await this.loadConversations();
+            } catch(e) {}
+        },
+
+        async sendMessage() {
+            if (!this.newMessage.trim()) return;
+            try {
+                await api('/api/conversations/' + this.selectedId + '/messages/', {
+                    method: 'POST',
+                    body: JSON.stringify({ direction: 'outgoing', source: 'manual', body: this.newMessage })
+                });
+                this.newMessage = '';
+                await this.selectConv(this.selectedId);
+            } catch(e) { toast('Errore invio', 'error'); }
+        },
+
+        platformIcon(p) { return {subito:'🟠',ebay:'🔵',vinted:'🟢',facebook:'🔷',telegram:'✈️'}[p]||'📱'; },
+        timeAgo(iso) {
+            if (!iso) return '';
+            const d = Date.now() - new Date(iso).getTime(), m = Math.floor(d/60000);
+            if (m < 1) return 'ora'; if (m < 60) return m+'min';
+            const h = Math.floor(m/60); if (h < 24) return h+'h'; return Math.floor(h/24)+'gg';
+        },
+        formatTime(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleString('it-IT', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        },
+    };
+}
+</script>
+{% endblock %}

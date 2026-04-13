@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime
+from sqlalchemy import String, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -10,7 +10,9 @@ class Owner(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: uuid.uuid4().hex[:16])
     name: Mapped[str] = mapped_column(String, nullable=False)
-    telegram_chat_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    telegram_chat_id: Mapped[str | None] = mapped_column(String)
+    email: Mapped[str | None] = mapped_column(String)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     products = relationship("Product", back_populates="owner", lazy="selectin")
