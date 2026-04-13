@@ -406,147 +406,142 @@
         <button class="absolute top-6 right-6 text-white text-3xl hover:text-gray-300">&times;</button>
     </div>
 
-    <!-- STAZIONE DI PUBBLICAZIONE (Mega Popup) -->
+    <!-- STAZIONE DI PUBBLICAZIONE (Fullscreen con iframe) -->
     <div x-show="pubStation.open" x-cloak
-         class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-         @keydown.escape.window="pubStation.open = false">
-        <div @click.stop class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+         class="fixed inset-0 z-50 bg-black/70 flex flex-col"
+         @keydown.escape.window="closePubStation()">
 
-            <!-- Header -->
-            <div class="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-2xl">
-                <div>
-                    <h2 class="text-lg font-bold">🚀 Stazione di Pubblicazione</h2>
-                    <p class="text-xs text-indigo-100 mt-0.5" x-text="p.title"></p>
+        <!-- Top Bar compatta -->
+        <div class="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <span x-html="pubStation.steps.length ? platformLogo(pubStation.currentStep().platform, 22) : ''"></span>
+                <span class="text-sm font-bold capitalize" x-text="pubStation.steps.length ? pubStation.currentStep().platform : ''"></span>
+                <span x-show="pubStation.steps.length && pubStation.currentStep().account_name" class="text-xs bg-white/20 px-2 py-0.5 rounded-full" x-text="pubStation.currentStep().account_name"></span>
+                <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full" x-text="(pubStation.currentIdx + 1) + '/' + pubStation.steps.length"></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Steps nav -->
+                <template x-for="(step, idx) in pubStation.steps" :key="idx">
+                    <button @click="goToStep(idx)"
+                            class="w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center transition"
+                            :class="idx === pubStation.currentIdx ? 'bg-white text-indigo-600' : step.done ? 'bg-green-400 text-white' : 'bg-white/20 text-white/70 hover:bg-white/30'"
+                            x-text="idx + 1"></button>
+                </template>
+                <button @click="closePubStation()" class="ml-3 text-white/80 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="h-1 bg-gray-800 flex-shrink-0">
+            <div class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300"
+                 :style="'width:' + ((pubStation.currentIdx + 1) / Math.max(pubStation.steps.length, 1) * 100) + '%'"></div>
+        </div>
+
+        <!-- Main content: iframe + sidebar -->
+        <div class="flex-1 flex overflow-hidden" x-show="pubStation.steps.length > 0">
+
+            <!-- LEFT: iframe della piattaforma (occupa tutto lo spazio) -->
+            <div class="flex-1 bg-gray-900 relative flex flex-col">
+                <!-- Iframe -->
+                <iframe x-ref="pubIframe"
+                        :src="pubStation.iframeUrl"
+                        class="flex-1 w-full bg-white"
+                        :class="pubStation.iframeBlocked ? 'hidden' : ''"
+                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                        @load="onIframeLoad()"
+                        allow="clipboard-write"></iframe>
+
+                <!-- Fallback se iframe bloccato -->
+                <div x-show="pubStation.iframeBlocked" class="flex-1 flex flex-col items-center justify-center bg-gray-50 text-center p-8">
+                    <div class="text-6xl mb-4">🔒</div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2" x-text="pubStation.currentStep().platform + ' non permette la visualizzazione interna'"></h3>
+                    <p class="text-sm text-gray-500 mb-6 max-w-md">Per motivi di sicurezza, questa piattaforma blocca il caricamento dentro altri siti. Usa il pulsante qui sotto per aprirla in una finestra separata.</p>
+                    <button @click="openPlatformWindow(pubStation.currentStep())"
+                            class="px-8 py-3 text-base font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-lg transition flex items-center gap-2">
+                        🌐 Apri <span class="capitalize" x-text="pubStation.currentStep().platform"></span> in nuova finestra
+                    </button>
+                    <p class="text-xs text-gray-400 mt-3">Il testo dell'annuncio è stato copiato automaticamente negli appunti</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="text-xs bg-white/20 px-3 py-1 rounded-full" x-text="pubStation.currentIdx + 1 + '/' + pubStation.steps.length"></span>
-                    <button @click="pubStation.open = false" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+
+                <!-- Bottom bar sopra iframe con copia rapida -->
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 text-white text-xs flex-shrink-0">
+                    <button @click="copyPlatformText(pubStation.currentStep().platform)"
+                            class="px-3 py-1 bg-indigo-500 hover:bg-indigo-600 rounded font-semibold transition">📋 Copia testo</button>
+                    <span class="text-gray-400 truncate flex-1" x-text="'Prezzo: €' + (p.price_listed || p.price_initial || '—') + ' · ' + (p.title || '')"></span>
+                    <button @click="openPlatformWindow(pubStation.currentStep())"
+                            class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded transition">↗ Nuova finestra</button>
                 </div>
             </div>
 
-            <!-- Progress Bar -->
-            <div class="h-1.5 bg-gray-200">
-                <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
-                     :style="'width:' + ((pubStation.currentIdx + 1) / pubStation.steps.length * 100) + '%'"></div>
-            </div>
+            <!-- RIGHT: Sidebar aggiornamento -->
+            <div class="w-72 xl:w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 overflow-y-auto">
 
-            <!-- Content -->
-            <div class="flex-1 overflow-y-auto p-6">
-                <template x-if="pubStation.steps.length > 0">
+                <!-- Testo annuncio (collapsible) -->
+                <div class="border-b border-gray-100">
+                    <button @click="pubStation.showText = !pubStation.showText"
+                            class="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-gray-500 uppercase hover:bg-gray-50">
+                        <span>Testo annuncio</span>
+                        <span x-text="pubStation.showText ? '▼' : '▶'" class="text-[10px]"></span>
+                    </button>
+                    <div x-show="pubStation.showText" x-cloak class="px-4 pb-3">
+                        <p class="font-semibold text-sm text-gray-900 mb-1" x-text="getPlatformTitle(pubStation.currentStep().platform)"></p>
+                        <p class="text-xs text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed" x-text="getPlatformDesc(pubStation.currentStep().platform)"></p>
+                    </div>
+                </div>
+
+                <!-- Form aggiornamento -->
+                <div class="flex-1 p-4 space-y-3">
+                    <p class="text-xs font-bold text-gray-500 uppercase">Aggiorna pubblicazione</p>
+
                     <div>
-                        <!-- Current Step -->
-                        <div class="flex items-center gap-4 mb-6">
-                            <span x-html="platformLogo(pubStation.currentStep().platform, 40)"></span>
-                            <div>
-                                <h3 class="text-xl font-bold capitalize" x-text="pubStation.currentStep().platform"></h3>
-                                <p class="text-sm text-gray-500" x-text="pubStation.currentStep().account_name || 'Account non selezionato'"></p>
-                            </div>
-                            <div class="ml-auto flex items-center gap-2">
-                                <span class="text-xs px-3 py-1 rounded-full font-semibold"
-                                      :class="pubStation.currentStep().done ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-                                      x-text="pubStation.currentStep().done ? '✅ Completato' : '⏳ Da fare'"></span>
-                            </div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Link annuncio</label>
+                        <input type="url" x-model="pubStation.currentStep().link" placeholder="https://..."
+                               class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Prezzo</label>
+                            <input type="number" step="0.01" x-model.number="pubStation.currentStep().price_published"
+                                   :placeholder="p.price_listed || p.price_initial || '€'"
+                                   class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
                         </div>
-
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                            <!-- LEFT: Testo da copiare -->
-                            <div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <p class="text-xs font-bold text-gray-500 uppercase">Testo annuncio</p>
-                                    <button @click="copyPlatformText(pubStation.currentStep().platform)"
-                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                                        📋 Copia tutto
-                                    </button>
-                                </div>
-                                <div class="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 max-h-60 overflow-y-auto border border-gray-200">
-                                    <p class="font-bold text-gray-900 mb-2" x-text="getPlatformTitle(pubStation.currentStep().platform)"></p>
-                                    <p class="whitespace-pre-wrap" x-text="getPlatformDesc(pubStation.currentStep().platform)"></p>
-                                </div>
-
-                                <div class="mt-4 flex items-center gap-3">
-                                    <p class="text-xs font-bold text-gray-500 uppercase">Prezzo</p>
-                                    <span class="text-lg font-bold text-green-600" x-text="'€' + (p.price_listed || p.price_initial || '—')"></span>
-                                </div>
-                            </div>
-
-                            <!-- RIGHT: Apri piattaforma + aggiorna -->
-                            <div class="space-y-4">
-                                <!-- Apri piattaforma -->
-                                <button @click="openPlatformWindow(pubStation.currentStep())"
-                                        class="w-full py-4 text-base font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-lg transition flex items-center justify-center gap-2">
-                                    🌐 Apri <span class="capitalize" x-text="pubStation.currentStep().platform"></span>
-                                    <span x-show="pubStation.currentStep().account_name" class="text-sm opacity-80" x-text="'(' + pubStation.currentStep().account_name + ')'"></span>
-                                </button>
-
-                                <!-- Form aggiornamento rapido -->
-                                <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                                    <p class="text-xs font-bold text-gray-500 uppercase mb-3">Aggiorna dopo aver pubblicato</p>
-                                    <div class="space-y-3">
-                                        <div>
-                                            <label class="text-[10px] font-bold text-gray-400 uppercase">Link annuncio</label>
-                                            <input type="url" x-model="pubStation.currentStep().link" placeholder="https://..."
-                                                   class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-indigo-500 outline-none">
-                                        </div>
-                                        <div class="grid grid-cols-3 gap-3">
-                                            <div>
-                                                <label class="text-[10px] font-bold text-gray-400 uppercase">Prezzo pubbl.</label>
-                                                <input type="number" step="0.01" x-model.number="pubStation.currentStep().price_published"
-                                                       :placeholder="p.price_listed || p.price_initial || '€'"
-                                                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] font-bold text-gray-400 uppercase">Viste</label>
-                                                <input type="number" x-model.number="pubStation.currentStep().views" placeholder="0"
-                                                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] font-bold text-gray-400 uppercase">Messaggi</label>
-                                                <input type="number" x-model.number="pubStation.currentStep().messages" placeholder="0"
-                                                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label class="text-[10px] font-bold text-gray-400 uppercase">Stato</label>
-                                            <select x-model="pubStation.currentStep().status"
-                                                    class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
-                                                <option value="published">✅ Pubblicato</option>
-                                                <option value="pending">⏳ In attesa</option>
-                                                <option value="paused">⏸ In pausa</option>
-                                                <option value="removed">🗑 Rimosso</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <button @click="savePubStationStep()"
-                                            class="w-full mt-3 px-4 py-2.5 text-sm font-bold bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
-                                        💾 Salva e
-                                        <span x-text="pubStation.currentIdx < pubStation.steps.length - 1 ? 'Prossimo →' : 'Chiudi'"></span>
-                                    </button>
-
-                                    <button @click="skipPubStationStep()"
-                                            class="w-full mt-2 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 text-center">
-                                        Salta questo →
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Steps Overview -->
-                        <div class="mt-6 flex gap-2 overflow-x-auto pb-2">
-                            <template x-for="(step, idx) in pubStation.steps" :key="idx">
-                                <button @click="pubStation.currentIdx = idx"
-                                        class="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition"
-                                        :class="idx === pubStation.currentIdx ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold' : step.done ? 'border-green-300 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'">
-                                    <span x-html="platformLogo(step.platform, 18)"></span>
-                                    <span class="capitalize" x-text="step.platform"></span>
-                                    <span x-show="step.account_name" class="text-[10px] opacity-60" x-text="step.account_name"></span>
-                                    <span x-show="step.done" class="text-green-500">✓</span>
-                                </button>
-                            </template>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Stato</label>
+                            <select x-model="pubStation.currentStep().status"
+                                    class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                                <option value="published">✅ Pubblicato</option>
+                                <option value="pending">⏳ In attesa</option>
+                                <option value="paused">⏸ Pausa</option>
+                                <option value="removed">🗑 Rimosso</option>
+                            </select>
                         </div>
                     </div>
-                </template>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Viste</label>
+                            <input type="number" x-model.number="pubStation.currentStep().views" placeholder="0"
+                                   class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Messaggi</label>
+                            <input type="number" x-model.number="pubStation.currentStep().messages" placeholder="0"
+                                   class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom actions -->
+                <div class="p-4 border-t border-gray-200 space-y-2 flex-shrink-0">
+                    <button @click="savePubStationStep()"
+                            class="w-full px-4 py-2.5 text-sm font-bold bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
+                        💾 Salva e
+                        <span x-text="pubStation.currentIdx < pubStation.steps.length - 1 ? 'Prossimo →' : 'Chiudi'"></span>
+                    </button>
+                    <button @click="skipPubStationStep()"
+                            class="w-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 text-center">
+                        Salta →
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -570,7 +565,7 @@ function productDetail() {
         showAddPub: false,
         editingPub: null,
         newPub: { platform: '', account_id: '', link: '', price_published: null },
-        pubStation: { open: false, steps: [], currentIdx: 0, currentStep() { return this.steps[this.currentIdx] || {}; } },
+        pubStation: { open: false, steps: [], currentIdx: 0, iframeUrl: '', iframeBlocked: false, showText: false, currentStep() { return this.steps[this.currentIdx] || {}; } },
 
         init() {
             this.editForm = { ...this.p };
@@ -833,17 +828,62 @@ function productDetail() {
             this.pubStation.steps = steps;
             this.pubStation.currentIdx = steps.findIndex(s => !s.done);
             if (this.pubStation.currentIdx < 0) this.pubStation.currentIdx = 0;
+            this.pubStation.iframeBlocked = false;
+            this.pubStation.showText = false;
+            this.loadStepIframe();
             this.pubStation.open = true;
         },
 
-        openPlatformWindow(step) {
-            // Auto-copia testo prima di aprire
+        closePubStation() {
+            this.pubStation.iframeUrl = '';
+            this.pubStation.open = false;
+            this.reloadPubs();
+        },
+
+        goToStep(idx) {
+            this.pubStation.currentIdx = idx;
+            this.pubStation.iframeBlocked = false;
+            this.loadStepIframe();
+        },
+
+        loadStepIframe() {
+            const step = this.pubStation.currentStep();
+            if (!step.platform) return;
+            const url = step.login_url || this.platformSellUrls[step.platform] || '';
+            this.pubStation.iframeUrl = url;
+            this.pubStation.iframeBlocked = false;
+            // Auto-copia testo
             this.copyPlatformText(step.platform);
+            // Timeout: se dopo 4s l'iframe non ha caricato, segna come bloccato
+            this._iframeTimer = setTimeout(() => {
+                if (!this._iframeLoaded) {
+                    this.pubStation.iframeBlocked = true;
+                }
+            }, 4000);
+            this._iframeLoaded = false;
+        },
 
-            // URL: usa login_url dell'account se presente, altrimenti URL sell della piattaforma
+        onIframeLoad() {
+            this._iframeLoaded = true;
+            clearTimeout(this._iframeTimer);
+            // Prova a verificare se il contenuto è accessibile (same-origin)
+            try {
+                const iframe = this.$refs.pubIframe;
+                if (iframe && iframe.contentDocument) {
+                    const body = iframe.contentDocument.body;
+                    if (!body || body.innerHTML.length < 50) {
+                        this.pubStation.iframeBlocked = true;
+                    }
+                }
+            } catch(e) {
+                // Cross-origin: l'iframe ha caricato ma non possiamo accedere al contenuto
+                // Se il load event è partito, il sito probabilmente funziona nell'iframe
+            }
+        },
+
+        openPlatformWindow(step) {
+            this.copyPlatformText(step.platform);
             let url = step.login_url || this.platformSellUrls[step.platform] || '#';
-
-            // Apri in popup window grande
             const w = Math.min(screen.width - 100, 1400);
             const h = Math.min(screen.height - 100, 900);
             const left = (screen.width - w) / 2;
@@ -919,9 +959,10 @@ function productDetail() {
                 // Avanza al prossimo
                 if (this.pubStation.currentIdx < this.pubStation.steps.length - 1) {
                     this.pubStation.currentIdx++;
+                    this.pubStation.iframeBlocked = false;
+                    this.loadStepIframe();
                 } else {
-                    this.pubStation.open = false;
-                    await this.reloadPubs();
+                    this.closePubStation();
                     toast('🎉 Tutte le pubblicazioni completate!');
                 }
             } catch(e) {
@@ -932,9 +973,10 @@ function productDetail() {
         skipPubStationStep() {
             if (this.pubStation.currentIdx < this.pubStation.steps.length - 1) {
                 this.pubStation.currentIdx++;
+                this.pubStation.iframeBlocked = false;
+                this.loadStepIframe();
             } else {
-                this.pubStation.open = false;
-                this.reloadPubs();
+                this.closePubStation();
             }
         }
     };
