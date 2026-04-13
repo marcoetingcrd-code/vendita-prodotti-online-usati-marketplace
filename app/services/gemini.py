@@ -1,31 +1,51 @@
 import json
-import base64
+import uuid
+import logging
 from pathlib import Path
-import google.generativeai as genai
-from app.config import GEMINI_API_KEY, BASE_DIR
+from google import genai
+from google.genai import types
+from PIL import Image
+from app.config import GEMINI_API_KEY, BASE_DIR, PROCESSED_DIR
 
-_configured = False
+logger = logging.getLogger(__name__)
+
+_client = None
+TEXT_MODEL = "gemini-2.0-flash"
+IMAGE_MODEL = "gemini-2.0-flash-exp"
 
 
-def _ensure_configured():
-    global _configured
-    if not _configured and GEMINI_API_KEY:
-        genai.configure(api_key=GEMINI_API_KEY)
-        _configured = True
+def _get_client():
+    global _client
+    if _client is None and GEMINI_API_KEY:
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
+
+
+def _load_image(image_path: str) -> Image.Image:
+    p = Path(image_path)
+    full_path = p if p.is_absolute() else (BASE_DIR / p).resolve()
+    return Image.open(str(full_path))
+
+
+def _extract_text(response) -> str:
+    for part in response.candidates[0].content.parts:
+        if part.text:
+            return part.text
+    return ""
+
+
+def _parse_json(text: str) -> dict:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    return json.loads(text)
 
 
 async def analyze_product_image(image_path: str, user_description: str = "") -> dict:
     """Analizza un'immagine prodotto con Gemini Vision.
     Restituisce: oggetto riconosciuto, categoria, condizione, dimensioni stimate, prezzo suggerito."""
-    _ensure_configured()
-
-    p = Path(image_path)
-    full_path = p if p.is_absolute() else (BASE_DIR / p).resolve()
-    img_bytes = full_path.read_bytes()
-    img_b64 = base64.b64encode(img_bytes).decode()
-    mime = "image/jpeg" if image_path.lower().endswith((".jpg", ".jpeg")) else "image/png"
-
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    client = _get_client()
+    img = _load_image(image_path)
 
     user_hint = f"\n\nL'utente ha scritto: \"{user_description}\"" if user_description else ""
 
@@ -41,11 +61,6 @@ Per il PREZZO SUGGERITO:
 - Cerca di stimare un prezzo realistico per il mercato dell'usato italiano (Subito, eBay, Vinted, Facebook Marketplace)
 - Considera: marca, condizione, età stimata, domanda tipica, stagionalità
 - Dai anche un range (prezzo_min e prezzo_max)
-
-Per lo SCONTORNAMENTO:
-- Decidi se ha senso scontornare la prima foto (rimuovere sfondo per foto pulita prodotto)
-- Rispondi "yes" se il prodotto è un oggetto isolabile (borsa, scarpe, sedia, elettronica...)
-- Rispondi "no" se il prodotto è ambientato e lo scontornamento rovinerebbe la foto (stanza, giardino con panchina e persone, cucina installata...)
 
 Rispondi SOLO con un JSON valido (senza markdown, senza ```), con questi campi:
 {{
@@ -63,22 +78,165 @@ Rispondi SOLO con un JSON valido (senza markdown, senza ```), con questi campi:
   "price_range_max": prezzo massimo ragionevole,
   "confidence": 0.0-1.0,
   "key_features": ["feature1", "feature2", "feature3"],
-  "should_remove_bg": true o false,
   "questions": ["domanda 1 per ottenere info mancanti", "domanda 2", "domanda 3"]
 }}
 
 Il campo "questions" deve contenere 2-4 domande utili da fare all'utente per completare l'annuncio (es: marca, difetti nascosti, anno acquisto, motivo vendita, disponibilità spedizione)."""
 
-    response = await model.generate_content_async([
-        prompt,
-        {"mime_type": mime, "data": img_b64}
-    ])
+    response = await client.aio.models.generate_content(
+        model=TEXT_MODEL,
+        contents=[prompt, img],
+    )
 
-    text = response.text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    text = _extract_text(response)
+    return _parse_json(text)
 
-    return json.loads(text)
+
+async def generate_product_image(image_paths: list[str], analysis: dict, user_description: str = "") -> str | None:
+    """Genera un'immagine professionale del prodotto usando Gemini Image Generation.
+    Combina le foto fornite, rimuove sfondo, ricostruisce il prodotto completo su sfondo neutro.
+    Restituisce il path dell'immagine salvata o None se fallisce."""
+    client = _get_client()
+
+    images = []
+    for ip in image_paths[:4]:
+        try:
+            images.append(_load_image(ip))
+        except Exception as e:
+            logger.warning(f"Errore caricamento immagine {ip}: {e}")
+
+    if not images:
+        return None
+
+    obj_name = analysis.get("object", "prodotto")
+    materials = analysis.get("materials", "")
+    color = analysis.get("color", "")
+    dims = analysis.get("dimensions_estimate", "")
+
+    extra_context = ""
+    if user_description:
+        extra_context = f"\nL'utente ha descritto il prodotto come: \"{user_description}\""
+
+    multi_photo_note = ""
+    if len(images) > 1:
+        multi_photo_note = f"\nHo fornito {len(images)} foto dello stesso prodotto da angolazioni diverse. Usale tutte per ricostruire il prodotto completo e preciso."
+
+    prompt = f"""Sei un fotografo professionista di e-commerce. Genera un'immagine professionale di questo prodotto per un annuncio di vendita online.
+
+PRODOTTO: {obj_name}
+MATERIALI: {materials or 'vedi dalle foto'}
+COLORE: {color or 'vedi dalle foto'}
+DIMENSIONI: {dims or 'stima dalle foto'}{extra_context}{multi_photo_note}
+
+ISTRUZIONI CRITICHE:
+1. RICONOSCI il prodotto nelle foto e GENERA un'immagine pulita professionale
+2. MANTIENI tutti i dettagli reali: texture del legno, colore del metallo, usura naturale, venature, graffi se presenti
+3. SFONDO: grigio chiaro neutro da studio fotografico (#F5F5F5)
+4. ANGOLAZIONE: 3/4 prospettica, come foto da catalogo IKEA
+5. Il prodotto deve essere mostrato COMPLETO e ASSEMBLATO anche se le foto lo mostrano smontato o da angolazioni parziali
+6. ILLUMINAZIONE: morbida e uniforme, no ombre dure
+7. NON inventare dettagli che non esistono nelle foto originali
+8. NON aggiungere testo, watermark, prezzi o etichette sull'immagine
+9. L'immagine deve essere FOTOREALISTICA, non un rendering 3D o un disegno"""
+
+    try:
+        contents = [prompt] + images
+        response = await client.aio.models.generate_content(
+            model=IMAGE_MODEL,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+            ),
+        )
+
+        for part in response.candidates[0].content.parts:
+            if part.inline_data is not None:
+                filename = f"{uuid.uuid4().hex}_ai_gen.png"
+                output_path = (PROCESSED_DIR / filename).resolve()
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                img_data = part.inline_data.data
+                with open(str(output_path), "wb") as f:
+                    f.write(img_data)
+
+                return str(output_path.relative_to(BASE_DIR.resolve()))
+
+    except Exception as e:
+        logger.error(f"Errore generazione immagine Gemini: {e}")
+
+    return None
+
+
+async def refine_product_image(
+    original_image_paths: list[str],
+    current_generated_path: str | None,
+    refinement_request: str,
+    analysis: dict,
+) -> dict:
+    """Raffina l'immagine generata basandosi sulle istruzioni dell'utente.
+    Restituisce {"image_path": str|None, "text": str}."""
+    client = _get_client()
+
+    images = []
+    for ip in original_image_paths[:4]:
+        try:
+            images.append(_load_image(ip))
+        except Exception:
+            pass
+
+    if current_generated_path:
+        try:
+            images.append(_load_image(current_generated_path))
+        except Exception:
+            pass
+
+    obj_name = analysis.get("object", "prodotto")
+
+    prompt = f"""Sei un fotografo professionista di e-commerce. Stai lavorando alla foto di un prodotto: {obj_name}.
+
+L'utente ha richiesto questa modifica sull'immagine generata:
+"{refinement_request}"
+
+ISTRUZIONI:
+1. Applica la modifica richiesta mantenendo la qualità professionale
+2. MANTIENI tutti i dettagli reali: texture, colore, usura
+3. SFONDO: grigio chiaro neutro (#F5F5F5) salvo diversa indicazione
+4. NON aggiungere testo, watermark, prezzi sull'immagine
+5. L'immagine deve essere FOTOREALISTICA
+6. Se la richiesta è impossibile, genera comunque la migliore versione possibile e spiega nel testo
+
+Genera l'immagine modificata."""
+
+    result = {"image_path": None, "text": ""}
+
+    try:
+        contents = [prompt] + images
+        response = await client.aio.models.generate_content(
+            model=IMAGE_MODEL,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+            ),
+        )
+
+        for part in response.candidates[0].content.parts:
+            if part.text:
+                result["text"] = part.text
+            elif part.inline_data is not None:
+                filename = f"{uuid.uuid4().hex}_ai_refined.png"
+                output_path = (PROCESSED_DIR / filename).resolve()
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(str(output_path), "wb") as f:
+                    f.write(part.inline_data.data)
+
+                result["image_path"] = str(output_path.relative_to(BASE_DIR.resolve()))
+
+    except Exception as e:
+        logger.error(f"Errore raffinamento immagine: {e}")
+        result["text"] = f"Errore durante il raffinamento: {str(e)}"
+
+    return result
 
 
 async def generate_listing_descriptions(
@@ -92,10 +250,8 @@ async def generate_listing_descriptions(
     price: float | None,
     location: str | None = None,
 ) -> dict:
-    """Genera descrizioni ottimizzate per Subito, eBay e Vinted."""
-    _ensure_configured()
-
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    """Genera descrizioni ottimizzate per Subito, eBay, Vinted, Facebook, Vestiaire."""
+    client = _get_client()
 
     details = f"""Oggetto: {object_name}
 Categoria: {category}
@@ -138,10 +294,10 @@ Rispondi SOLO con un JSON valido (senza markdown), con questa struttura:
   }}
 }}"""
 
-    response = await model.generate_content_async(prompt)
+    response = await client.aio.models.generate_content(
+        model=TEXT_MODEL,
+        contents=[prompt],
+    )
 
-    text = response.text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-
-    return json.loads(text)
+    text = _extract_text(response)
+    return _parse_json(text)

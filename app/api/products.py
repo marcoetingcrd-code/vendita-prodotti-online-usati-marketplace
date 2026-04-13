@@ -82,7 +82,7 @@ async def ai_draft(
         original_path = image_processor.save_original(data, ext)
         image_paths.append(original_path)
 
-    # 2. Analisi AI con Gemini Vision (PRIMA dello scontornamento per decidere se farlo)
+    # 2. Analisi AI con Gemini Vision
     analysis = {}
     if image_paths:
         try:
@@ -102,18 +102,28 @@ async def ai_draft(
                 "price_range_max": None,
                 "confidence": 0.0,
                 "key_features": [],
-                "should_remove_bg": True,
                 "questions": [],
             }
 
-    # 3. Scontornamento intelligente: solo se l'AI dice che ha senso
+    # 3. Genera immagine professionale con Gemini AI (generativa, non semplice rembg)
     processed_path = None
-    should_remove_bg = analysis.get("should_remove_bg", True)
-    if image_paths and should_remove_bg:
+    if image_paths:
         try:
-            processed_path = image_processor.process_image(image_paths[0])
+            processed_path = await gemini.generate_product_image(
+                image_paths=image_paths,
+                analysis=analysis,
+                user_description=description,
+            )
         except Exception as e:
-            logger.warning(f"Errore processing immagine: {e}")
+            logger.warning(f"Errore generazione immagine AI: {e}")
+
+        # Fallback: se Gemini image gen fallisce, usa rembg classico
+        if not processed_path:
+            try:
+                processed_path = image_processor.process_image(image_paths[0])
+                logger.info("Fallback a rembg per scontornamento")
+            except Exception as e:
+                logger.warning(f"Errore anche rembg fallback: {e}")
 
     # 4. Genera descrizioni per tutte le piattaforme
     descriptions = {}
@@ -143,6 +153,37 @@ async def ai_draft(
         "descriptions": descriptions,
         "owner_id": owner_id,
         "owner_name": owner.name,
+    }
+
+
+@router.post("/ai-refine-image")
+async def ai_refine_image(
+    refinement: str = Form(...),
+    original_paths: str = Form(""),
+    current_generated: str = Form(""),
+    analysis_json: str = Form("{}"),
+):
+    """Raffina l'immagine AI generata con istruzioni dell'utente (es: 'togli il testo', 'aggiungi le gambe')."""
+    import json as _json
+
+    analysis = {}
+    try:
+        analysis = _json.loads(analysis_json)
+    except Exception:
+        pass
+
+    orig_paths = [p.strip() for p in original_paths.split(",") if p.strip()]
+
+    result = await gemini.refine_product_image(
+        original_image_paths=orig_paths,
+        current_generated_path=current_generated or None,
+        refinement_request=refinement,
+        analysis=analysis,
+    )
+
+    return {
+        "processed_path": result.get("image_path"),
+        "text": result.get("text", ""),
     }
 
 

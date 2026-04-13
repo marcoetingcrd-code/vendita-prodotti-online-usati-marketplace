@@ -44,24 +44,45 @@
                                 <div class="bg-white rounded-2xl rounded-tl-md border border-gray-200 shadow-sm overflow-hidden">
                                     <!-- Photos Preview -->
                                     <div class="p-4 border-b border-gray-100">
-                                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Foto prodotto</p>
+                                        <div class="flex items-center justify-between mb-3">
+                                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Foto prodotto</p>
+                                            <button x-show="draft.processed_path" @click="showRefineInput = !showRefineInput"
+                                                    class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                                                🎨 Modifica foto AI
+                                            </button>
+                                        </div>
                                         <div class="flex gap-3 overflow-x-auto pb-2">
                                             <template x-for="(img, j) in draft.images" :key="j">
                                                 <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-gray-100 relative cursor-pointer hover:ring-2 hover:ring-indigo-400 transition"
                                                      @click="openLightbox('/' + img.path)">
                                                     <img :src="'/' + img.path" class="w-full h-full object-cover">
-                                                    <div x-show="j === 0 && draft.processed_path" class="absolute bottom-0 left-0 right-0 bg-green-600 text-white text-[9px] text-center py-0.5">Originale</div>
+                                                    <div class="absolute bottom-0 left-0 right-0 bg-gray-800/70 text-white text-[9px] text-center py-0.5">Originale</div>
                                                 </div>
                                             </template>
                                             <template x-if="draft.processed_path">
-                                                <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-[#f0f0f0] relative border-2 border-green-500 cursor-pointer hover:ring-2 hover:ring-green-400 transition"
+                                                <div class="flex-shrink-0 w-32 h-32 rounded-xl overflow-hidden bg-[#f0f0f0] relative border-2 border-emerald-500 cursor-pointer hover:ring-2 hover:ring-emerald-400 transition shadow-lg"
                                                      @click="openLightbox('/' + draft.processed_path)">
                                                     <img :src="'/' + draft.processed_path" class="w-full h-full object-contain">
-                                                    <div class="absolute bottom-0 left-0 right-0 bg-green-600 text-white text-[9px] text-center py-0.5">Scontornata AI</div>
+                                                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[9px] text-center py-0.5 font-bold">✨ Generata AI</div>
                                                 </div>
                                             </template>
                                         </div>
-                                        <p x-show="!draft.processed_path" class="text-[10px] text-gray-400 mt-1">💡 Scontornamento non applicato (prodotto ambientato)</p>
+                                        <p x-show="!draft.processed_path" class="text-[10px] text-amber-600 mt-1">⏳ Immagine AI non generata — verrà usata la foto originale</p>
+
+                                        <!-- Refine Image Input -->
+                                        <div x-show="showRefineInput" x-cloak class="mt-3 border border-indigo-200 bg-indigo-50/50 rounded-xl p-3">
+                                            <p class="text-[10px] text-gray-500 mb-2">Chiedi modifiche all'AI (es: "togli lo sfondo", "aggiungi le gambe", "rimuovi il testo", "mostra il prodotto assemblato")</p>
+                                            <div class="flex gap-2">
+                                                <input type="text" x-model="refineRequest" placeholder="Es: rimuovi il testo e mostra il prodotto completo..."
+                                                       class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                       @keydown.enter.prevent="refineImage()">
+                                                <button @click="refineImage()" :disabled="refining || !refineRequest.trim()"
+                                                        class="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40">
+                                                    <span x-show="!refining">🎨 Applica</span>
+                                                    <span x-show="refining">⏳...</span>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <!-- Analysis -->
@@ -240,17 +261,21 @@ function aiChat() {
         activeTab: 'subito',
         draft: null,
         lightboxSrc: null,
+        showRefineInput: false,
+        refineRequest: '',
+        refining: false,
 
         init() {
             this.addAiMessage(`<p class="text-base font-semibold text-gray-900 mb-2">Ciao! Sono il tuo assistente AI per la creazione prodotti.</p>
                 <p class="text-sm text-gray-600 mb-3">Ecco come funziona:</p>
                 <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                    <li><strong>Carica le foto</strong> del prodotto (usa il pulsante 📸)</li>
+                    <li><strong>Carica le foto</strong> del prodotto (anche più foto da angolazioni diverse)</li>
                     <li><strong>Descrivi brevemente</strong> l'oggetto, difetti, materiali...</li>
-                    <li><strong>Premi invio</strong> e io analizzo le foto, scontorno la prima, e genero le descrizioni per Subito, eBay, Vinted, Facebook e Vestiaire Collective</li>
+                    <li><strong>Premi invio</strong> e io: analizzo, genero una foto professionale, e creo le descrizioni per 5 piattaforme</li>
+                    <li><strong>Raffina la foto</strong> chiedendomi modifiche ("togli lo sfondo", "mostra assemblato")</li>
                     <li><strong>Modifica</strong> quello che vuoi e crea il prodotto!</li>
                 </ol>
-                <p class="text-sm text-gray-500 mt-3 italic">Puoi anche solo caricare le foto senza scrivere nulla — farò tutto io.</p>`);
+                <p class="text-sm text-gray-500 mt-3 italic">Carica anche solo le foto senza scrivere nulla — farò tutto io. Più foto carichi, meglio ricostruisco il prodotto.</p>`);
         },
 
         addAiMessage(html) {
@@ -292,6 +317,15 @@ function aiChat() {
             const text = this.userInput.trim();
             const photoCount = this.files.length;
             if (!text && !photoCount) return;
+
+            // Se il draft esiste e non ci sono nuove foto, tratta come richiesta di raffinamento immagine
+            if (this.draft && !photoCount && text) {
+                this.refineRequest = text;
+                this.userInput = '';
+                await this.refineImage();
+                return;
+            }
+
             if (!photoCount) {
                 this.addAiMessage('<p class="text-sm text-amber-700">⚠️ Carica almeno una foto del prodotto per iniziare l\'analisi.</p>');
                 return;
@@ -310,9 +344,10 @@ function aiChat() {
                 fd.append('owner_id', '{{ owners[0].id if owners else "" }}');
 
                 // Update progress
-                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 40; this.messages[loadIdx].text = 'Scontornamento prima foto...'; }, 2000);
-                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 60; this.messages[loadIdx].text = 'Analisi Gemini Vision...'; }, 5000);
-                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 80; this.messages[loadIdx].text = 'Generazione descrizioni 5 piattaforme...'; }, 10000);
+                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 30; this.messages[loadIdx].text = 'Analisi Gemini Vision...'; }, 2000);
+                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 50; this.messages[loadIdx].text = 'Generazione foto professionale AI...'; }, 6000);
+                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 75; this.messages[loadIdx].text = 'Generazione descrizioni 5 piattaforme...'; }, 15000);
+                setTimeout(() => { if (this.messages[loadIdx]) this.messages[loadIdx].progress = 90; this.messages[loadIdx].text = 'Quasi pronto...'; }, 25000);
 
                 const res = await fetch('/api/products/ai-draft', { method: 'POST', body: fd });
                 if (!res.ok) throw new Error('Errore analisi');
@@ -447,6 +482,48 @@ function aiChat() {
 
         now() {
             return new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        async refineImage() {
+            if (!this.draft || !this.refineRequest.trim()) return;
+            this.refining = true;
+            const request = this.refineRequest.trim();
+            this.addUserMessage('🎨 ' + request, 0);
+            const loadIdx = this.addLoading('Modifico l\'immagine con AI...', 50);
+
+            try {
+                const fd = new FormData();
+                fd.append('refinement', request);
+                fd.append('original_paths', this.draft.images.map(i => i.path).join(','));
+                fd.append('current_generated', this.draft.processed_path || '');
+                fd.append('analysis_json', JSON.stringify({
+                    object: this.draft.title,
+                    category: this.draft.category,
+                    materials: this.draft.materials,
+                    color: this.draft.color,
+                }));
+
+                const res = await fetch('/api/products/ai-refine-image', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('Errore raffinamento');
+                const data = await res.json();
+
+                this.removeLoading(loadIdx);
+
+                if (data.processed_path) {
+                    this.draft.processed_path = data.processed_path;
+                    this.addAiMessage(`<p class="text-sm text-gray-900">✨ Foto aggiornata! Clicca sull'immagine per vederla a schermo intero.</p>${data.text ? '<p class="text-xs text-gray-500 mt-1">' + data.text + '</p>' : ''}`);
+                } else {
+                    this.addAiMessage(`<p class="text-sm text-amber-700">⚠️ Non sono riuscito a generare la modifica. ${data.text || 'Riprova con istruzioni diverse.'}</p>`);
+                }
+
+                this.refineRequest = '';
+            } catch(e) {
+                this.removeLoading(loadIdx);
+                this.addAiMessage(`<p class="text-sm text-red-600">❌ ${e.message || 'Errore'}</p>`);
+            } finally {
+                this.refining = false;
+                this.scrollDown();
+            }
         },
 
         openLightbox(src) {
