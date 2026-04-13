@@ -231,15 +231,13 @@
 
             <!-- Publication per Platform -->
             <div class="bg-white rounded-xl border border-gray-200 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Pubblicazioni</h2>
-                    <div class="flex items-center gap-2">
-                        <button @click="openPubStation()"
-                                class="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-sm">
-                            🚀 Pubblica su tutte
-                        </button>
-                        <button @click="showAddPub = !showAddPub" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ Singola</button>
-                    </div>
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide flex-1 min-w-0">Pubblicazioni</h2>
+                    <button @click="openPubStation()"
+                            class="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-sm whitespace-nowrap">
+                        🚀 Pubblica su tutte
+                    </button>
+                    <button @click="showAddPub = !showAddPub" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 whitespace-nowrap">+ Singola</button>
                 </div>
 
                 <!-- Add new publication -->
