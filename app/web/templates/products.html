@@ -82,7 +82,7 @@
                     <!-- Platforms -->
                     <div class="col-span-2 flex items-center gap-1">
                         <template x-for="pub in (p.publications || [])" :key="pub.id">
-                            <span class="text-sm" :title="pub.platform" x-text="platformIcon(pub.platform)"></span>
+                            <span :title="pub.platform" x-html="platformLogo(pub.platform, 18)"></span>
                         </template>
                         <span x-show="!p.publications || !p.publications.length" class="text-xs text-gray-400">—</span>
                     </div>

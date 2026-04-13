@@ -55,12 +55,12 @@
     <!-- B: Platform Cards -->
     <div class="mb-6">
         <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Piattaforme</h2>
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <template x-for="name in ['subito','ebay','vinted','facebook']" :key="name">
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <template x-for="name in ['subito','ebay','vinted','facebook','vestiaire']" :key="name">
                 <a :href="'/panel/prodotti?platform=' + name"
                    class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-md hover:border-indigo-300 transition cursor-pointer">
                     <div class="flex items-center gap-2 mb-3">
-                        <span class="text-xl" x-text="platformIcon(name)"></span>
+                        <span x-html="platformLogo(name, 24)"></span>
                         <span class="text-sm font-bold capitalize" x-text="name"></span>
                     </div>
                     <div class="space-y-1.5 text-xs">
@@ -144,7 +144,7 @@
                 <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                     <template x-for="c in conversations" :key="c.id">
                         <a :href="'/panel/inbox?id=' + c.id" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
-                            <span class="flex-shrink-0 text-base" x-text="platformIcon(c.platform)"></span>
+                            <span class="flex-shrink-0" x-html="platformLogo(c.platform, 20)"></span>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm font-semibold text-gray-900" x-text="c.contact_name || 'Sconosciuto'"></span>

@@ -10,7 +10,7 @@ from app.models.event import Event
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
-PLATFORMS = ["subito", "ebay", "vinted", "facebook"]
+PLATFORMS = ["subito", "ebay", "vinted", "facebook", "vestiaire"]
 
 
 def _aware(dt):

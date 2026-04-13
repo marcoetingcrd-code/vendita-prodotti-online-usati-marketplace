@@ -18,10 +18,10 @@
                         :class="convFilter === 'hot' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Caldi 🔥</button>
             </div>
             <div class="flex gap-2">
-                <template x-for="p in ['subito','ebay','vinted','facebook']" :key="p">
+                <template x-for="p in ['subito','ebay','vinted','facebook','vestiaire']" :key="p">
                     <button @click="platformFilter = platformFilter === p ? '' : p; loadConversations()"
-                            class="px-2 py-1 text-xs rounded-lg" :class="platformFilter === p ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'"
-                            x-text="platformIcon(p)"></button>
+                            class="px-2 py-1 rounded-lg" :class="platformFilter === p ? 'bg-indigo-100 ring-2 ring-indigo-300' : 'bg-gray-50 hover:bg-gray-100'"
+                            x-html="platformLogo(p, 20)"></button>
                 </template>
             </div>
         </div>
@@ -37,7 +37,7 @@
             <template x-for="c in conversations" :key="c.id">
                 <div @click="selectConv(c.id)" class="flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 transition"
                      :class="selectedId === c.id ? 'bg-indigo-50 border-l-2 border-l-indigo-600' : 'hover:bg-gray-50'">
-                    <span class="flex-shrink-0 text-xl" x-text="platformIcon(c.platform)"></span>
+                    <span class="flex-shrink-0" x-html="platformLogo(c.platform, 24)"></span>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-semibold" :class="c.unread_count ? 'text-gray-900' : 'text-gray-700'" x-text="c.contact_name || 'Sconosciuto'"></span>
@@ -68,7 +68,7 @@
             <div class="flex-1 flex flex-col">
                 <!-- Conv Header -->
                 <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-                    <span class="text-2xl" x-text="platformIcon(detail.platform)"></span>
+                    <span x-html="platformLogo(detail.platform, 28)"></span>
                     <div class="flex-1">
                         <h3 class="text-base font-bold text-gray-900" x-text="detail.contact_name || 'Sconosciuto'"></h3>
                         <div class="flex items-center gap-3 text-xs text-gray-500">

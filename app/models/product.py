@@ -49,6 +49,7 @@ class Product(Base):
     urgency: Mapped[str] = mapped_column(String, default="low")  # low, medium, high
     measurements: Mapped[str | None] = mapped_column(Text)
     desc_facebook: Mapped[str | None] = mapped_column(Text)
+    desc_vestiaire: Mapped[str | None] = mapped_column(Text)
 
     ai_detected_object: Mapped[str | None] = mapped_column(String)
     ai_confidence: Mapped[float | None] = mapped_column(Float)

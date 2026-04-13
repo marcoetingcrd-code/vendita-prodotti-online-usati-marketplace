@@ -234,6 +234,24 @@ function globalSearch() {
         }
     };
 }
+
+function platformLogo(name, size) {
+    size = size || 22;
+    const r = Math.round(size * 0.22);
+    const fs = Math.round(size * 0.48);
+    const logos = {
+        subito: {bg:'#FA6831', fg:'#fff', text:'S'},
+        ebay: {bg:'#E53238', fg:'#fff', text:'e'},
+        vinted: {bg:'#09B1BA', fg:'#fff', text:'V'},
+        facebook: {bg:'#1877F2', fg:'#fff', text:'f'},
+        vestiaire: {bg:'#1A1A1A', fg:'#fff', text:'VC'},
+        telegram: {bg:'#26A5E4', fg:'#fff', text:'T'},
+    };
+    const l = logos[name] || {bg:'#9CA3AF', fg:'#fff', text:'?'};
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" rx="${r}" fill="${l.bg}"/><text x="${size/2}" y="${size*0.7}" text-anchor="middle" fill="${l.fg}" font-size="${fs}" font-weight="700" font-family="Inter,Arial,sans-serif">${l.text}</text></svg>`;
+}
+
+function platformLogoHtml(name, size) { return platformLogo(name, size); }
 </script>
 
 {% block scripts %}{% endblock %}

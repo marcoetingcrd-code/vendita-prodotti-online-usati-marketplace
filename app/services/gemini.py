@@ -81,25 +81,33 @@ Prezzo: {'€' + str(price) if price else 'Da definire'}
 Zona ritiro: {location or 'Da specificare'}"""
 
     prompt = f"""Sei un esperto di annunci per marketplace dell'usato in Italia.
-Genera 3 versioni dell'annuncio per lo stesso prodotto.
+Genera 5 versioni dell'annuncio per lo stesso prodotto, ciascuna ottimizzata per la piattaforma.
 
 DATI PRODOTTO:
 {details}
 
 Rispondi SOLO con un JSON valido (senza markdown), con questa struttura:
 {{
-  "title": "titolo accattivante (max 60 caratteri)",
+  "title": "titolo accattivante generale (max 60 caratteri)",
   "subito": {{
-    "title": "titolo per Subito.it (max 50 char, diretto)",
-    "description": "descrizione per Subito.it (tono diretto, pratico, prezzo in evidenza, max 800 char)"
+    "title": "titolo per Subito.it (max 50 char, diretto, pratico)",
+    "description": "descrizione per Subito.it (tono diretto, prezzo in evidenza, zona ritiro, max 800 char)"
   }},
   "ebay": {{
-    "title": "titolo per eBay (max 80 char, dettagliato con keyword)",
-    "description": "descrizione per eBay (dettagliata, specifiche tecniche, condizioni precise, max 1200 char)"
+    "title": "titolo per eBay (max 80 char, dettagliato con keyword SEO)",
+    "description": "descrizione per eBay (dettagliata, specifiche tecniche, condizioni precise, spedizione, max 1200 char)"
   }},
   "vinted": {{
-    "title": "titolo per Vinted (max 50 char, casual)",
+    "title": "titolo per Vinted (max 50 char, casual, trendy)",
     "description": "descrizione per Vinted (tono casual, emotivo, hashtag alla fine, max 600 char)"
+  }},
+  "facebook": {{
+    "title": "titolo per Facebook Marketplace (max 60 char, diretto)",
+    "description": "descrizione per Facebook Marketplace (colloquiale, disponibilità ritiro, max 600 char)"
+  }},
+  "vestiaire": {{
+    "title": "titolo per Vestiaire Collective (max 60 char, elegante, luxury-oriented)",
+    "description": "descrizione per Vestiaire Collective (tono curato, focus su brand/materiali/condizioni, autenticità, max 800 char)"
   }}
 }}"""
 

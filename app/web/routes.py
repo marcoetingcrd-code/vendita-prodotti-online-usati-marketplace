@@ -24,6 +24,7 @@ def _serialize_product(p: Product) -> dict:
         "desc_ebay": p.desc_ebay,
         "desc_vinted": p.desc_vinted,
         "desc_facebook": p.desc_facebook,
+        "desc_vestiaire": p.desc_vestiaire,
         "category": p.category,
         "condition": p.condition,
         "condition_score": p.condition_score,

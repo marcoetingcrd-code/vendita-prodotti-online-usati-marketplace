@@ -1,4 +1,6 @@
+import logging
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,12 +50,95 @@ class ProductUpdate(BaseModel):
     desc_ebay: str | None = None
     desc_vinted: str | None = None
     desc_facebook: str | None = None
+    desc_vestiaire: str | None = None
     platforms: list[str] | None = None
     platform_links: dict | None = None
 
 
 class SoldRequest(BaseModel):
     price_sold: float
+
+
+logger = logging.getLogger(__name__)
+
+
+@router.post("/ai-draft")
+async def ai_draft(
+    files: list[UploadFile] = File(...),
+    description: str = Form(""),
+    owner_id: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Chat AI: riceve foto + testo, analizza, genera descrizioni per tutte le piattaforme."""
+    owner = await db.get(Owner, owner_id)
+    if not owner:
+        raise HTTPException(404, "Owner non trovato")
+
+    # 1. Salva immagini originali
+    image_paths = []
+    for f in files:
+        data = await f.read()
+        ext = "." + (f.filename.rsplit(".", 1)[-1] if "." in (f.filename or "") else "jpg")
+        original_path = image_processor.save_original(data, ext)
+        image_paths.append(original_path)
+
+    # 2. Processa prima immagine (rembg - scontornatura)
+    processed_path = None
+    if image_paths:
+        try:
+            processed_path = image_processor.process_image(image_paths[0])
+        except Exception as e:
+            logger.warning(f"Errore processing immagine: {e}")
+
+    # 3. Analisi AI con Gemini Vision
+    analysis = {}
+    if image_paths:
+        try:
+            analysis = await gemini.analyze_product_image(image_paths[0])
+        except Exception as e:
+            logger.warning(f"Errore analisi Gemini: {e}")
+            analysis = {
+                "object": "Oggetto non riconosciuto",
+                "category": "Altro",
+                "condition": "buono",
+                "condition_score": 3,
+                "defects": None,
+                "dimensions_estimate": None,
+                "materials": None,
+                "suggested_price_eur": None,
+                "confidence": 0.0,
+                "key_features": [],
+            }
+
+    # 4. Genera descrizioni per tutte le piattaforme
+    descriptions = {}
+    try:
+        combined_features = analysis.get("key_features", [])
+        if description:
+            combined_features.append(description)
+
+        descriptions = await gemini.generate_listing_descriptions(
+            object_name=analysis.get("object", "Oggetto"),
+            category=analysis.get("category", "Altro"),
+            condition=analysis.get("condition", "buono"),
+            defects=analysis.get("defects"),
+            dimensions=analysis.get("dimensions_estimate"),
+            materials=analysis.get("materials"),
+            features=combined_features,
+            price=analysis.get("suggested_price_eur"),
+            location=None,
+        )
+    except Exception as e:
+        logger.warning(f"Errore generazione descrizioni: {e}")
+
+    return {
+        "image_paths": image_paths,
+        "processed_path": processed_path,
+        "analysis": analysis,
+        "descriptions": descriptions,
+        "owner_id": owner_id,
+        "owner_name": owner.name,
+    }
 
 
 @router.get("/")
@@ -351,6 +436,7 @@ def _serialize_product(p: Product) -> dict:
         "desc_ebay": p.desc_ebay,
         "desc_vinted": p.desc_vinted,
         "desc_facebook": p.desc_facebook,
+        "desc_vestiaire": p.desc_vestiaire,
         "category": p.category,
         "condition": p.condition,
         "condition_score": p.condition_score,
