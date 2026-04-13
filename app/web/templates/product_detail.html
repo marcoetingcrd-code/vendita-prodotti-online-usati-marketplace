@@ -233,7 +233,13 @@
             <div class="bg-white rounded-xl border border-gray-200 p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Pubblicazioni</h2>
-                    <button @click="showAddPub = !showAddPub" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ Aggiungi</button>
+                    <div class="flex items-center gap-2">
+                        <button @click="openPubStation()"
+                                class="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 shadow-sm">
+                            🚀 Pubblica su tutte
+                        </button>
+                        <button @click="showAddPub = !showAddPub" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ Singola</button>
+                    </div>
                 </div>
 
                 <!-- Add new publication -->
@@ -399,6 +405,151 @@
         <img :src="lightboxSrc" class="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl">
         <button class="absolute top-6 right-6 text-white text-3xl hover:text-gray-300">&times;</button>
     </div>
+
+    <!-- STAZIONE DI PUBBLICAZIONE (Mega Popup) -->
+    <div x-show="pubStation.open" x-cloak
+         class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+         @keydown.escape.window="pubStation.open = false">
+        <div @click.stop class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-2xl">
+                <div>
+                    <h2 class="text-lg font-bold">🚀 Stazione di Pubblicazione</h2>
+                    <p class="text-xs text-indigo-100 mt-0.5" x-text="p.title"></p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs bg-white/20 px-3 py-1 rounded-full" x-text="pubStation.currentIdx + 1 + '/' + pubStation.steps.length"></span>
+                    <button @click="pubStation.open = false" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="h-1.5 bg-gray-200">
+                <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
+                     :style="'width:' + ((pubStation.currentIdx + 1) / pubStation.steps.length * 100) + '%'"></div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <template x-if="pubStation.steps.length > 0">
+                    <div>
+                        <!-- Current Step -->
+                        <div class="flex items-center gap-4 mb-6">
+                            <span x-html="platformLogo(pubStation.currentStep().platform, 40)"></span>
+                            <div>
+                                <h3 class="text-xl font-bold capitalize" x-text="pubStation.currentStep().platform"></h3>
+                                <p class="text-sm text-gray-500" x-text="pubStation.currentStep().account_name || 'Account non selezionato'"></p>
+                            </div>
+                            <div class="ml-auto flex items-center gap-2">
+                                <span class="text-xs px-3 py-1 rounded-full font-semibold"
+                                      :class="pubStation.currentStep().done ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                                      x-text="pubStation.currentStep().done ? '✅ Completato' : '⏳ Da fare'"></span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                            <!-- LEFT: Testo da copiare -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-xs font-bold text-gray-500 uppercase">Testo annuncio</p>
+                                    <button @click="copyPlatformText(pubStation.currentStep().platform)"
+                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                        📋 Copia tutto
+                                    </button>
+                                </div>
+                                <div class="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 max-h-60 overflow-y-auto border border-gray-200">
+                                    <p class="font-bold text-gray-900 mb-2" x-text="getPlatformTitle(pubStation.currentStep().platform)"></p>
+                                    <p class="whitespace-pre-wrap" x-text="getPlatformDesc(pubStation.currentStep().platform)"></p>
+                                </div>
+
+                                <div class="mt-4 flex items-center gap-3">
+                                    <p class="text-xs font-bold text-gray-500 uppercase">Prezzo</p>
+                                    <span class="text-lg font-bold text-green-600" x-text="'€' + (p.price_listed || p.price_initial || '—')"></span>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT: Apri piattaforma + aggiorna -->
+                            <div class="space-y-4">
+                                <!-- Apri piattaforma -->
+                                <button @click="openPlatformWindow(pubStation.currentStep())"
+                                        class="w-full py-4 text-base font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-lg transition flex items-center justify-center gap-2">
+                                    🌐 Apri <span class="capitalize" x-text="pubStation.currentStep().platform"></span>
+                                    <span x-show="pubStation.currentStep().account_name" class="text-sm opacity-80" x-text="'(' + pubStation.currentStep().account_name + ')'"></span>
+                                </button>
+
+                                <!-- Form aggiornamento rapido -->
+                                <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                    <p class="text-xs font-bold text-gray-500 uppercase mb-3">Aggiorna dopo aver pubblicato</p>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="text-[10px] font-bold text-gray-400 uppercase">Link annuncio</label>
+                                            <input type="url" x-model="pubStation.currentStep().link" placeholder="https://..."
+                                                   class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-400 uppercase">Prezzo pubbl.</label>
+                                                <input type="number" step="0.01" x-model.number="pubStation.currentStep().price_published"
+                                                       :placeholder="p.price_listed || p.price_initial || '€'"
+                                                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-400 uppercase">Viste</label>
+                                                <input type="number" x-model.number="pubStation.currentStep().views" placeholder="0"
+                                                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-400 uppercase">Messaggi</label>
+                                                <input type="number" x-model.number="pubStation.currentStep().messages" placeholder="0"
+                                                       class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-bold text-gray-400 uppercase">Stato</label>
+                                            <select x-model="pubStation.currentStep().status"
+                                                    class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mt-1">
+                                                <option value="published">✅ Pubblicato</option>
+                                                <option value="pending">⏳ In attesa</option>
+                                                <option value="paused">⏸ In pausa</option>
+                                                <option value="removed">🗑 Rimosso</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button @click="savePubStationStep()"
+                                            class="w-full mt-3 px-4 py-2.5 text-sm font-bold bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
+                                        💾 Salva e
+                                        <span x-text="pubStation.currentIdx < pubStation.steps.length - 1 ? 'Prossimo →' : 'Chiudi'"></span>
+                                    </button>
+
+                                    <button @click="skipPubStationStep()"
+                                            class="w-full mt-2 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 text-center">
+                                        Salta questo →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Steps Overview -->
+                        <div class="mt-6 flex gap-2 overflow-x-auto pb-2">
+                            <template x-for="(step, idx) in pubStation.steps" :key="idx">
+                                <button @click="pubStation.currentIdx = idx"
+                                        class="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition"
+                                        :class="idx === pubStation.currentIdx ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold' : step.done ? 'border-green-300 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'">
+                                    <span x-html="platformLogo(step.platform, 18)"></span>
+                                    <span class="capitalize" x-text="step.platform"></span>
+                                    <span x-show="step.account_name" class="text-[10px] opacity-60" x-text="step.account_name"></span>
+                                    <span x-show="step.done" class="text-green-500">✓</span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -419,6 +570,7 @@ function productDetail() {
         showAddPub: false,
         editingPub: null,
         newPub: { platform: '', account_id: '', link: '', price_published: null },
+        pubStation: { open: false, steps: [], currentIdx: 0, currentStep() { return this.steps[this.currentIdx] || {}; } },
 
         init() {
             this.editForm = { ...this.p };
@@ -611,6 +763,179 @@ function productDetail() {
         copyText(text) {
             navigator.clipboard.writeText(text);
             toast('Copiato negli appunti!');
+        },
+
+        // === STAZIONE DI PUBBLICAZIONE ===
+
+        platformSellUrls: {
+            subito: 'https://www.subito.it/inserisci-annuncio',
+            ebay: 'https://www.ebay.it/sell/create',
+            vinted: 'https://www.vinted.it/items/new',
+            facebook: 'https://www.facebook.com/marketplace/create/item',
+            vestiaire: 'https://www.vestiairecollective.com/sell/',
+        },
+
+        openPubStation() {
+            const platforms = ['subito', 'ebay', 'vinted', 'facebook', 'vestiaire'];
+            const steps = [];
+
+            for (const plat of platforms) {
+                const accounts = this.accountsForPlatform(plat);
+                if (accounts.length > 0) {
+                    for (const acc of accounts) {
+                        steps.push({
+                            platform: plat,
+                            account_id: acc.id,
+                            account_name: acc.account_name,
+                            login_url: acc.login_url,
+                            profile_url: acc.profile_url,
+                            link: '',
+                            price_published: this.p.price_listed || this.p.price_initial || null,
+                            views: null,
+                            messages: null,
+                            status: 'published',
+                            done: false,
+                            pub_id: null,
+                        });
+                    }
+                } else {
+                    steps.push({
+                        platform: plat,
+                        account_id: null,
+                        account_name: null,
+                        login_url: null,
+                        profile_url: null,
+                        link: '',
+                        price_published: this.p.price_listed || this.p.price_initial || null,
+                        views: null,
+                        messages: null,
+                        status: 'published',
+                        done: false,
+                        pub_id: null,
+                    });
+                }
+            }
+
+            // Se ci sono pubblicazioni esistenti, segna come già completate
+            for (const pub of this.publications) {
+                const match = steps.find(s => s.platform === pub.platform && (s.account_id === pub.account_id || !s.account_id));
+                if (match && !match.done) {
+                    match.done = true;
+                    match.pub_id = pub.id;
+                    match.link = pub.link || '';
+                    match.price_published = pub.price_published;
+                    match.views = pub.views_count;
+                    match.messages = pub.messages_count;
+                    match.status = pub.status;
+                }
+            }
+
+            this.pubStation.steps = steps;
+            this.pubStation.currentIdx = steps.findIndex(s => !s.done);
+            if (this.pubStation.currentIdx < 0) this.pubStation.currentIdx = 0;
+            this.pubStation.open = true;
+        },
+
+        openPlatformWindow(step) {
+            // Auto-copia testo prima di aprire
+            this.copyPlatformText(step.platform);
+
+            // URL: usa login_url dell'account se presente, altrimenti URL sell della piattaforma
+            let url = step.login_url || this.platformSellUrls[step.platform] || '#';
+
+            // Apri in popup window grande
+            const w = Math.min(screen.width - 100, 1400);
+            const h = Math.min(screen.height - 100, 900);
+            const left = (screen.width - w) / 2;
+            const top = (screen.height - h) / 2;
+            window.open(url, `pub_${step.platform}`, `width=${w},height=${h},left=${left},top=${top},toolbar=yes,location=yes,menubar=yes,scrollbars=yes`);
+        },
+
+        getPlatformTitle(platform) {
+            const titles = {
+                subito: this.p.title,
+                ebay: this.p.title,
+                vinted: this.p.title,
+                facebook: this.p.title,
+                vestiaire: this.p.title,
+            };
+            return titles[platform] || this.p.title || '';
+        },
+
+        getPlatformDesc(platform) {
+            const descs = {
+                subito: this.p.desc_subito,
+                ebay: this.p.desc_ebay,
+                vinted: this.p.desc_vinted,
+                facebook: this.p.desc_facebook,
+                vestiaire: this.p.desc_vestiaire,
+            };
+            return descs[platform] || this.p.description_raw || 'Nessuna descrizione generata per questa piattaforma';
+        },
+
+        copyPlatformText(platform) {
+            const title = this.getPlatformTitle(platform);
+            const desc = this.getPlatformDesc(platform);
+            const price = this.p.price_listed || this.p.price_initial || '';
+            const fullText = `${title}\n\n${desc}${price ? '\n\nPrezzo: €' + price : ''}`;
+            navigator.clipboard.writeText(fullText);
+            toast(`📋 Testo ${platform} copiato!`);
+        },
+
+        async savePubStationStep() {
+            const step = this.pubStation.currentStep();
+
+            try {
+                if (step.pub_id) {
+                    // Aggiorna pubblicazione esistente
+                    await api(`/api/products/${this.p.id}/publications/${step.pub_id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            account_id: step.account_id || null,
+                            link: step.link || null,
+                            status: step.status,
+                            price_published: step.price_published,
+                            views_count: step.views,
+                            messages_count: step.messages,
+                        })
+                    });
+                } else {
+                    // Crea nuova pubblicazione
+                    await api(`/api/products/${this.p.id}/publications/`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            platform: step.platform,
+                            account_id: step.account_id || null,
+                            link: step.link || null,
+                            price_published: step.price_published,
+                            status: step.status,
+                        })
+                    });
+                }
+
+                step.done = true;
+                toast(`✅ ${step.platform} salvato!`);
+
+                // Avanza al prossimo
+                if (this.pubStation.currentIdx < this.pubStation.steps.length - 1) {
+                    this.pubStation.currentIdx++;
+                } else {
+                    this.pubStation.open = false;
+                    await this.reloadPubs();
+                    toast('🎉 Tutte le pubblicazioni completate!');
+                }
+            } catch(e) {
+                toast(e.message, 'error');
+            }
+        },
+
+        skipPubStationStep() {
+            if (this.pubStation.currentIdx < this.pubStation.steps.length - 1) {
+                this.pubStation.currentIdx++;
+            } else {
+                this.pubStation.open = false;
+                this.reloadPubs();
+            }
         }
     };
 }
