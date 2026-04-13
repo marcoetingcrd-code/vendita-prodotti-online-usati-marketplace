@@ -20,9 +20,6 @@
     </script>
     <style>
         [x-cloak] { display: none !important; }
-        .sidebar-link { @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150; }
-        .sidebar-link.active { @apply bg-white/10 text-white; }
-        .sidebar-link:not(.active) { @apply text-gray-400 hover:text-white hover:bg-white/5; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     </style>
@@ -47,31 +44,35 @@
 
         <!-- Navigation -->
         <nav class="flex-1 px-3 py-4 space-y-1">
-            <a href="/panel" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
-                <span class="text-lg">📊</span> Dashboard
+            {% set sl = 'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150' %}
+            {% set sa = 'bg-white/10 text-white' %}
+            {% set si = 'text-gray-400 hover:text-white hover:bg-white/5' %}
+
+            <a href="/panel" class="{{ sl }} {% if active_page == 'dashboard' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                <span class="text-lg w-6 text-center">📊</span> <span>Dashboard</span>
             </a>
-            <a href="/panel/prodotti" class="sidebar-link {% if active_page == 'products' %}active{% endif %}">
-                <span class="text-lg">📦</span> Prodotti
+            <a href="/panel/prodotti" class="{{ sl }} {% if active_page == 'products' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                <span class="text-lg w-6 text-center">📦</span> <span>Prodotti</span>
             </a>
-            <a href="/panel/inbox" class="sidebar-link {% if active_page == 'inbox' %}active{% endif %}">
-                <span class="text-lg">📨</span> Inbox
+            <a href="/panel/prodotti/nuovo" class="{{ sl }} {% if active_page == 'new_product' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                <span class="text-lg w-6 text-center">🤖</span> <span>+ Nuovo (AI)</span>
+            </a>
+            <a href="/panel/inbox" class="{{ sl }} {% if active_page == 'inbox' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                <span class="text-lg w-6 text-center">📨</span> <span>Inbox</span>
                 <span x-show="poll.unread_messages > 0" x-cloak
                       class="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                       x-text="poll.unread_messages"></span>
             </a>
-            <a href="/panel/pubblicazioni" class="sidebar-link {% if active_page == 'publications' %}active{% endif %}">
-                <span class="text-lg">📢</span> Pubblicazioni
+            <a href="/panel/eventi" class="{{ sl }} {% if active_page == 'events' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                <span class="text-lg w-6 text-center">⚡</span> <span>Eventi</span>
             </a>
-            <a href="/panel/eventi" class="sidebar-link {% if active_page == 'events' %}active{% endif %}">
-                <span class="text-lg">⚡</span> Eventi
-            </a>
-            <a href="/panel/proprietari" class="sidebar-link {% if active_page == 'owners' %}active{% endif %}">
-                <span class="text-lg">👥</span> Proprietari
+            <a href="/panel/proprietari" class="{{ sl }} {% if active_page == 'owners' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                <span class="text-lg w-6 text-center">👥</span> <span>Proprietari</span>
             </a>
 
             <div class="pt-4 mt-4 border-t border-white/10">
-                <a href="/panel/impostazioni" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
-                    <span class="text-lg">⚙️</span> Impostazioni
+                <a href="/panel/impostazioni" class="{{ sl }} {% if active_page == 'settings' %}{{ sa }}{% else %}{{ si }}{% endif %}">
+                    <span class="text-lg w-6 text-center">⚙️</span> <span>Impostazioni</span>
                 </a>
             </div>
         </nav>
