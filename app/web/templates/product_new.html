@@ -47,18 +47,21 @@
                                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Foto prodotto</p>
                                         <div class="flex gap-3 overflow-x-auto pb-2">
                                             <template x-for="(img, j) in draft.images" :key="j">
-                                                <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-gray-100 relative">
+                                                <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-gray-100 relative cursor-pointer hover:ring-2 hover:ring-indigo-400 transition"
+                                                     @click="openLightbox('/' + img.path)">
                                                     <img :src="'/' + img.path" class="w-full h-full object-cover">
-                                                    <div x-show="j === 0 && draft.processed_path" class="absolute bottom-0 left-0 right-0 bg-green-600 text-white text-[9px] text-center py-0.5">Scontornata</div>
+                                                    <div x-show="j === 0 && draft.processed_path" class="absolute bottom-0 left-0 right-0 bg-green-600 text-white text-[9px] text-center py-0.5">Originale</div>
                                                 </div>
                                             </template>
                                             <template x-if="draft.processed_path">
-                                                <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-[#f0f0f0] relative border-2 border-green-500">
+                                                <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-[#f0f0f0] relative border-2 border-green-500 cursor-pointer hover:ring-2 hover:ring-green-400 transition"
+                                                     @click="openLightbox('/' + draft.processed_path)">
                                                     <img :src="'/' + draft.processed_path" class="w-full h-full object-contain">
-                                                    <div class="absolute bottom-0 left-0 right-0 bg-green-600 text-white text-[9px] text-center py-0.5">AI Processed</div>
+                                                    <div class="absolute bottom-0 left-0 right-0 bg-green-600 text-white text-[9px] text-center py-0.5">Scontornata AI</div>
                                                 </div>
                                             </template>
                                         </div>
+                                        <p x-show="!draft.processed_path" class="text-[10px] text-gray-400 mt-1">💡 Scontornamento non applicato (prodotto ambientato)</p>
                                     </div>
 
                                     <!-- Analysis -->
@@ -83,7 +86,14 @@
                                                     <span class="text-sm text-gray-500">€</span>
                                                     <input type="number" x-model.number="draft.price" class="w-full text-sm font-bold text-green-600 border-b border-transparent hover:border-gray-300 focus:border-indigo-500 outline-none py-0.5 bg-transparent ml-1">
                                                 </div>
+                                                <p x-show="draft.price_range_min || draft.price_range_max" class="text-[10px] text-gray-400 mt-0.5">
+                                                    Range: €<span x-text="draft.price_range_min"></span> — €<span x-text="draft.price_range_max"></span>
+                                                </p>
                                             </div>
+                                        </div>
+                                        <div x-show="draft.brand || draft.color" class="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                                            <span x-show="draft.brand">🏷️ <span x-text="draft.brand"></span></span>
+                                            <span x-show="draft.color">🎨 <span x-text="draft.color"></span></span>
                                         </div>
                                     </div>
 
@@ -207,6 +217,12 @@
             </div>
         </div>
     </div>
+    <!-- Lightbox -->
+    <div x-show="lightboxSrc" x-cloak @click="lightboxSrc = null" @keydown.escape.window="lightboxSrc = null"
+         class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-pointer">
+        <img :src="lightboxSrc" class="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl">
+        <button class="absolute top-6 right-6 text-white text-3xl hover:text-gray-300">&times;</button>
+    </div>
 </div>
 {% endblock %}
 
@@ -223,6 +239,7 @@ function aiChat() {
         regenerating: false,
         activeTab: 'subito',
         draft: null,
+        lightboxSrc: null,
 
         init() {
             this.addAiMessage(`<p class="text-base font-semibold text-gray-900 mb-2">Ciao! Sono il tuo assistente AI per la creazione prodotti.</p>
@@ -310,6 +327,10 @@ function aiChat() {
                     category: data.analysis?.category || 'Altro',
                     condition: data.analysis?.condition || 'buono',
                     price: data.analysis?.suggested_price_eur || null,
+                    price_range_min: data.analysis?.price_range_min || null,
+                    price_range_max: data.analysis?.price_range_max || null,
+                    brand: data.analysis?.brand || null,
+                    color: data.analysis?.color || null,
                     defects: data.analysis?.defects || null,
                     dimensions: data.analysis?.dimensions_estimate || null,
                     materials: data.analysis?.materials || null,
@@ -325,6 +346,17 @@ function aiChat() {
                 };
 
                 this.messages.push({ role: 'result' });
+
+                // AI follow-up questions
+                const questions = data.analysis?.questions || [];
+                if (questions.length > 0) {
+                    let qHtml = '<p class="text-sm font-semibold text-gray-900 mb-2">Ho bisogno di qualche dettaglio in più per migliorare l\'annuncio:</p><ul class="text-sm text-gray-600 space-y-1.5">';
+                    questions.forEach((q, i) => {
+                        qHtml += `<li class="flex items-start gap-2"><span class="text-indigo-500 font-bold">${i+1}.</span> ${q}</li>`;
+                    });
+                    qHtml += '</ul><p class="text-xs text-gray-400 mt-3">Rispondi qui sotto e premi invio. Oppure modifica direttamente i campi sopra.</p>';
+                    this.addAiMessage(qHtml);
+                }
 
                 // Clear files
                 this.previews.forEach(p => URL.revokeObjectURL(p.url));
@@ -415,6 +447,10 @@ function aiChat() {
 
         now() {
             return new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        openLightbox(src) {
+            this.lightboxSrc = src;
         },
 
         scrollDown() {

@@ -82,19 +82,11 @@ async def ai_draft(
         original_path = image_processor.save_original(data, ext)
         image_paths.append(original_path)
 
-    # 2. Processa prima immagine (rembg - scontornatura)
-    processed_path = None
-    if image_paths:
-        try:
-            processed_path = image_processor.process_image(image_paths[0])
-        except Exception as e:
-            logger.warning(f"Errore processing immagine: {e}")
-
-    # 3. Analisi AI con Gemini Vision
+    # 2. Analisi AI con Gemini Vision (PRIMA dello scontornamento per decidere se farlo)
     analysis = {}
     if image_paths:
         try:
-            analysis = await gemini.analyze_product_image(image_paths[0])
+            analysis = await gemini.analyze_product_image(image_paths[0], user_description=description)
         except Exception as e:
             logger.warning(f"Errore analisi Gemini: {e}")
             analysis = {
@@ -106,9 +98,22 @@ async def ai_draft(
                 "dimensions_estimate": None,
                 "materials": None,
                 "suggested_price_eur": None,
+                "price_range_min": None,
+                "price_range_max": None,
                 "confidence": 0.0,
                 "key_features": [],
+                "should_remove_bg": True,
+                "questions": [],
             }
+
+    # 3. Scontornamento intelligente: solo se l'AI dice che ha senso
+    processed_path = None
+    should_remove_bg = analysis.get("should_remove_bg", True)
+    if image_paths and should_remove_bg:
+        try:
+            processed_path = image_processor.process_image(image_paths[0])
+        except Exception as e:
+            logger.warning(f"Errore processing immagine: {e}")
 
     # 4. Genera descrizioni per tutte le piattaforme
     descriptions = {}

@@ -14,7 +14,7 @@ def _ensure_configured():
         _configured = True
 
 
-async def analyze_product_image(image_path: str) -> dict:
+async def analyze_product_image(image_path: str, user_description: str = "") -> dict:
     """Analizza un'immagine prodotto con Gemini Vision.
     Restituisce: oggetto riconosciuto, categoria, condizione, dimensioni stimate, prezzo suggerito."""
     _ensure_configured()
@@ -27,20 +27,47 @@ async def analyze_product_image(image_path: str) -> dict:
 
     model = genai.GenerativeModel("gemini-2.0-flash")
 
-    prompt = """Analizza questa foto di un oggetto in vendita su un marketplace dell'usato.
+    user_hint = f"\n\nL'utente ha scritto: \"{user_description}\"" if user_description else ""
+
+    prompt = f"""Sei un esperto di marketplace dell'usato in Italia. Analizza questa foto per identificare il PRODOTTO IN VENDITA.
+
+ATTENZIONE:
+- Identifica l'OGGETTO da vendere, NON le persone nella foto. Le persone possono essere presenti per scala/contesto ma il prodotto è la cosa da vendere.
+- Se ci sono persone sedute su una panchina, il prodotto è la PANCHINA, non le persone.
+- Se qualcuno indossa un capo, il prodotto è il CAPO DI ABBIGLIAMENTO.
+- Concentrati sull'oggetto/mobile/prodotto principale.{user_hint}
+
+Per il PREZZO SUGGERITO:
+- Cerca di stimare un prezzo realistico per il mercato dell'usato italiano (Subito, eBay, Vinted, Facebook Marketplace)
+- Considera: marca, condizione, età stimata, domanda tipica, stagionalità
+- Dai anche un range (prezzo_min e prezzo_max)
+
+Per lo SCONTORNAMENTO:
+- Decidi se ha senso scontornare la prima foto (rimuovere sfondo per foto pulita prodotto)
+- Rispondi "yes" se il prodotto è un oggetto isolabile (borsa, scarpe, sedia, elettronica...)
+- Rispondi "no" se il prodotto è ambientato e lo scontornamento rovinerebbe la foto (stanza, giardino con panchina e persone, cucina installata...)
+
 Rispondi SOLO con un JSON valido (senza markdown, senza ```), con questi campi:
-{
-  "object": "nome dell'oggetto identificato",
-  "category": "categoria merceologica (Arredamento, Elettronica, Abbigliamento, Sport, Casa, Altro)",
+{{
+  "object": "nome preciso dell'oggetto in vendita",
+  "category": "categoria (Arredamento, Elettronica, Abbigliamento, Sport, Casa, Giardino, Altro)",
   "condition": "nuovo | come_nuovo | buono | usato | difettoso",
   "condition_score": 1-5,
   "defects": "eventuali difetti visibili o null",
   "dimensions_estimate": "dimensioni stimate o null",
   "materials": "materiali identificati o null",
-  "suggested_price_eur": prezzo suggerito numerico,
+  "brand": "marca se riconoscibile o null",
+  "color": "colore principale o null",
+  "suggested_price_eur": prezzo suggerito numerico (migliore stima),
+  "price_range_min": prezzo minimo ragionevole,
+  "price_range_max": prezzo massimo ragionevole,
   "confidence": 0.0-1.0,
-  "key_features": ["feature1", "feature2"]
-}"""
+  "key_features": ["feature1", "feature2", "feature3"],
+  "should_remove_bg": true o false,
+  "questions": ["domanda 1 per ottenere info mancanti", "domanda 2", "domanda 3"]
+}}
+
+Il campo "questions" deve contenere 2-4 domande utili da fare all'utente per completare l'annuncio (es: marca, difetti nascosti, anno acquisto, motivo vendita, disponibilità spedizione)."""
 
     response = await model.generate_content_async([
         prompt,

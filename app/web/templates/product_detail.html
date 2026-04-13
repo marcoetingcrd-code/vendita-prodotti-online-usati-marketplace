@@ -38,10 +38,11 @@
 
                 <div x-show="p.images && p.images.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <template x-for="img in p.images" :key="img.id">
-                        <div class="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+                        <div class="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer"
+                             @click="lightboxSrc = '/' + (img.processed || img.original)">
                             <img :src="'/' + (img.processed || img.original)" class="w-full h-full object-cover">
                             <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                                <button @click="deleteImage(img.id)" class="bg-red-500 text-white rounded-full w-7 h-7 text-xs flex items-center justify-center">✕</button>
+                                <button @click.stop="deleteImage(img.id)" class="bg-red-500 text-white rounded-full w-7 h-7 text-xs flex items-center justify-center">✕</button>
                             </div>
                             <div x-show="img.is_primary" class="absolute bottom-0 left-0 right-0 bg-indigo-600 text-white text-xs text-center py-0.5">Principale</div>
                         </div>
@@ -391,6 +392,13 @@
             </div>
         </div>
     </div>
+
+    <!-- Lightbox -->
+    <div x-show="lightboxSrc" x-cloak @click="lightboxSrc = null" @keydown.escape.window="lightboxSrc = null"
+         class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-pointer">
+        <img :src="lightboxSrc" class="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl">
+        <button class="absolute top-6 right-6 text-white text-3xl hover:text-gray-300">&times;</button>
+    </div>
 </div>
 {% endblock %}
 
@@ -406,6 +414,7 @@ function productDetail() {
         editing: null,
         aiLoading: false,
         descLoading: false,
+        lightboxSrc: null,
         platformAccounts: {{ platform_accounts_json | safe }},
         showAddPub: false,
         editingPub: null,
