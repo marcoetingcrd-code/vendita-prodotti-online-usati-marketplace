@@ -13,6 +13,15 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 PLATFORMS = ["subito", "ebay", "vinted", "facebook"]
 
 
+def _aware(dt):
+    """Ensure datetime is timezone-aware for safe comparison."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
@@ -23,19 +32,19 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
     active = [p for p in products if p.status in ("listed", "negotiating", "ready")]
     sold = [p for p in products if p.status == "sold"]
-    sold_month = [p for p in sold if p.sold_at and p.sold_at >= now - timedelta(days=30)]
+    sold_month = [p for p in sold if p.sold_at and _aware(p.sold_at) >= now - timedelta(days=30)]
 
     unread = sum(c.unread_count for c in conversations)
     hot = [c for c in conversations if c.status == "hot"]
-    stale = [c for c in conversations if c.status == "open" and c.last_message_at and c.last_message_at < now - timedelta(hours=48)]
+    stale = [c for c in conversations if c.status == "open" and c.last_message_at and _aware(c.last_message_at) < now - timedelta(hours=48)]
 
     revenue_month = sum(p.price_sold or 0 for p in sold_month)
 
     return {
         "active_products": len(active),
-        "active_trend_7d": len([p for p in active if p.created_at and p.created_at >= week_ago]),
+        "active_trend_7d": len([p for p in active if p.created_at and _aware(p.created_at) >= week_ago]),
         "unread_messages": unread,
-        "unread_today": sum(1 for c in conversations if c.last_message_at and c.last_message_at.date() == now.date() and c.unread_count > 0),
+        "unread_today": sum(1 for c in conversations if c.last_message_at and _aware(c.last_message_at).date() == now.date() and c.unread_count > 0),
         "open_negotiations": len([p for p in products if p.status == "negotiating"]),
         "hot_conversations": len(hot),
         "stale_conversations": len(stale),
@@ -132,7 +141,7 @@ async def get_alerts(db: AsyncSession = Depends(get_db)):
         })
 
     # Stale negotiations
-    stale = [c for c in conversations if c.status == "open" and c.last_message_at and c.last_message_at < now - timedelta(hours=48)]
+    stale = [c for c in conversations if c.status == "open" and c.last_message_at and _aware(c.last_message_at) < now - timedelta(hours=48)]
     if stale:
         alerts.append({
             "type": "stale_conversations",
