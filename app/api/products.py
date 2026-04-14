@@ -105,25 +105,14 @@ async def ai_draft(
                 "questions": [],
             }
 
-    # 3. Genera immagine professionale con Gemini AI (generativa, non semplice rembg)
+    # 3. Rimuovi sfondo con rembg (gratuito, locale)
     processed_path = None
     if image_paths:
         try:
-            processed_path = await gemini.generate_product_image(
-                image_paths=image_paths,
-                analysis=analysis,
-                user_description=description,
-            )
+            processed_path = image_processor.process_image(image_paths[0])
+            logger.info("Sfondo rimosso con rembg")
         except Exception as e:
-            logger.warning(f"Errore generazione immagine AI: {e}")
-
-        # Fallback: se Gemini image gen fallisce, usa rembg classico
-        if not processed_path:
-            try:
-                processed_path = image_processor.process_image(image_paths[0])
-                logger.info("Fallback a rembg per scontornamento")
-            except Exception as e:
-                logger.warning(f"Errore anche rembg fallback: {e}")
+            logger.warning(f"Errore rembg: {e}")
 
     # 4. Genera descrizioni per tutte le piattaforme
     descriptions = {}
@@ -369,6 +358,8 @@ async def generate_descriptions(product_id: str, db: AsyncSession = Depends(get_
     product.desc_subito = descriptions.get("subito", {}).get("description")
     product.desc_ebay = descriptions.get("ebay", {}).get("description")
     product.desc_vinted = descriptions.get("vinted", {}).get("description")
+    product.desc_facebook = descriptions.get("facebook", {}).get("description")
+    product.desc_vestiaire = descriptions.get("vestiaire", {}).get("description")
     product.status = "ready" if product.status == "draft" else product.status
 
     await db.commit()
